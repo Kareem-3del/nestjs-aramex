@@ -1,5 +1,5 @@
 {
-  "name": "@aramax/nestjs-shipping",
+  "name": "nestjs-aramax-shipping",
   "version": "1.0.0",
   "description": "NestJS library for Aramax shipping search and tracking functionality",
   "main": "dist/index.js",
