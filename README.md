@@ -1,6 +1,6 @@
-# @aramax/nestjs-shipping
+# nestjs-aramex-api
 
-A NestJS library for Aramax shipping search and tracking functionality, providing a clean and type-safe interface for integrating with Aramax shipping services.
+Official NestJS library for Aramex shipping API integration, providing a clean and type-safe interface for integrating with Aramex shipping and tracking services.
 
 ## Features
 
@@ -16,7 +16,7 @@ A NestJS library for Aramax shipping search and tracking functionality, providin
 ## Installation
 
 ```bash
-npm install @aramax/nestjs-shipping
+npm install nestjs-aramex-api
 ```
 
 ## Quick Start
@@ -25,14 +25,15 @@ npm install @aramax/nestjs-shipping
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { AramaxModule } from '@aramax/nestjs-shipping';
+import { AramexModule } from 'nestjs-aramex-api';
 
 @Module({
   imports: [
-    AramaxModule.forRoot({
-      baseUrl: 'https://api.aramax.com',
-      apiKey: 'your-api-key',
-      clientId: 'your-client-id', // optional
+    AramexModule.forRoot({
+      baseUrl: 'https://api.aramex.net',
+      username: 'your-username',
+      password: 'your-password',
+      accountNumber: 'your-account-number',
       timeout: 30000, // optional, default: 30000ms
       debug: false, // optional, default: false
     }),
@@ -46,18 +47,19 @@ export class AppModule {}
 ```typescript
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AramaxModule } from '@aramax/nestjs-shipping';
+import { AramexModule } from 'nestjs-aramex-api';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    AramaxModule.forRootAsync({
+    AramexModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
-        baseUrl: configService.get('ARAMAX_BASE_URL'),
-        apiKey: configService.get('ARAMAX_API_KEY'),
-        clientId: configService.get('ARAMAX_CLIENT_ID'),
-        timeout: configService.get('ARAMAX_TIMEOUT', 30000),
-        debug: configService.get('ARAMAX_DEBUG', false),
+        baseUrl: configService.get('ARAMEX_BASE_URL'),
+        username: configService.get('ARAMEX_USERNAME'),
+        password: configService.get('ARAMEX_PASSWORD'),
+        accountNumber: configService.get('ARAMEX_ACCOUNT_NUMBER'),
+        timeout: configService.get('ARAMEX_TIMEOUT', 30000),
+        debug: configService.get('ARAMEX_DEBUG', false),
       }),
       inject: [ConfigService],
     }),
@@ -70,7 +72,7 @@ export class AppModule {}
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { ShippingService, TrackingService } from '@aramax/nestjs-shipping';
+import { ShippingService, TrackingService } from 'nestjs-aramex-api';
 
 @Injectable()
 export class MyService {
@@ -193,11 +195,12 @@ Get current status of a package without full history.
 Create a `.env` file with the following variables:
 
 ```env
-ARAMAX_BASE_URL=https://api.aramax.com
-ARAMAX_API_KEY=your-aramax-api-key
-ARAMAX_CLIENT_ID=your-client-id
-ARAMAX_TIMEOUT=30000
-ARAMAX_DEBUG=false
+ARAMEX_BASE_URL=https://api.aramex.net
+ARAMEX_USERNAME=your-aramex-username
+ARAMEX_PASSWORD=your-aramex-password
+ARAMEX_ACCOUNT_NUMBER=your-account-number
+ARAMEX_TIMEOUT=30000
+ARAMEX_DEBUG=false
 ```
 
 ## Error Handling
@@ -205,12 +208,12 @@ ARAMAX_DEBUG=false
 The library provides comprehensive error handling with custom exceptions:
 
 ```typescript
-import { AramaxHttpException } from '@aramax/nestjs-shipping';
+import { AramexHttpException } from 'nestjs-aramex-api';
 
 try {
   const result = await this.shippingService.searchShippingServices(request).toPromise();
 } catch (error) {
-  if (error instanceof AramaxHttpException) {
+  if (error instanceof AramexHttpException) {
     console.log('Status Code:', error.statusCode);
     console.log('Response:', error.response);
   }

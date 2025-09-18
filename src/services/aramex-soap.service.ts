@@ -3,8 +3,8 @@ import { Observable, from, throwError } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import * as soap from 'soap';
 import * as path from 'path';
-import { AramexConfig } from '../interfaces/aramax-config.interface';
-import { ARAMAX_CONFIG_TOKEN } from '../aramax-config.module';
+import { AramexConfig } from '../interfaces/aramex-config.interface';
+import { ARAMEX_CONFIG_TOKEN } from '../aramex-config.module';
 import {
   ClientInfo,
   ShipmentTrackingRequest,
@@ -31,7 +31,7 @@ export class AramexSoapService implements OnModuleInit {
   private readonly clientInfo: ClientInfo;
 
   constructor(
-    @Inject(ARAMAX_CONFIG_TOKEN) private readonly config: AramexConfig,
+    @Inject(ARAMEX_CONFIG_TOKEN) private readonly config: AramexConfig,
   ) {
     // Use local WSDL file path for better reliability
     this.wsdlUrl = path.join(__dirname, '../shipments-tracking-api-wsdl.wsdl');

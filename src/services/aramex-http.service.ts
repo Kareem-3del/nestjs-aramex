@@ -3,8 +3,8 @@ import { HttpService } from '@nestjs/axios';
 import { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map, timeout } from 'rxjs/operators';
-import { AramexConfig } from '../interfaces/aramax-config.interface';
-import { ARAMAX_CONFIG_TOKEN } from '../aramax-config.module';
+import { AramexConfig } from '../interfaces/aramex-config.interface';
+import { ARAMEX_CONFIG_TOKEN } from '../aramex-config.module';
 import { ARAMEX_BASE_URLS } from '../constants/endpoints';
 
 export class AramexHttpException extends Error {
@@ -26,7 +26,7 @@ export class AramexHttpService {
 
   constructor(
     private readonly httpService: HttpService,
-    @Inject(ARAMAX_CONFIG_TOKEN) private readonly config: AramexConfig,
+    @Inject(ARAMEX_CONFIG_TOKEN) private readonly config: AramexConfig,
   ) {
     this.baseUrl = config.sandbox ? ARAMEX_BASE_URLS.SANDBOX : ARAMEX_BASE_URLS.PRODUCTION;
     this.clientInfo = {

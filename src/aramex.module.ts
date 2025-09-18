@@ -1,11 +1,11 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { AramexConfigModule } from './aramax-config.module';
-import { AramexHttpService } from './services/aramax-http.service';
+import { AramexConfigModule } from './aramex-config.module';
+import { AramexHttpService } from './services/aramex-http.service';
 import { AramexSoapService } from './services/aramex-soap.service';
 import { ShippingService } from './services/shipping.service';
 import { TrackingService } from './services/tracking.service';
-import { AramexConfig } from './interfaces/aramax-config.interface';
+import { AramexConfig } from './interfaces/aramex-config.interface';
 
 @Module({})
 export class AramexModule {

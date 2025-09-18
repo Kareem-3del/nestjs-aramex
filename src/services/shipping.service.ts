@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { AramexHttpService } from './aramax-http.service';
+import { AramexHttpService } from './aramex-http.service';
 import {
   ShippingSearchRequest,
   ShippingSearchResponse,

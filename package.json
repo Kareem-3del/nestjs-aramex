@@ -1,7 +1,7 @@
 {
-  "name": "nestjs-aramax-shipping",
+  "name": "nestjs-aramex-api",
   "version": "1.0.0",
-  "description": "NestJS library for Aramax shipping search and tracking functionality",
+  "description": "Official NestJS library for Aramex shipping API integration with tracking and shipping services",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -18,10 +18,13 @@
   },
   "keywords": [
     "nestjs",
-    "aramax",
+    "aramex",
     "shipping",
     "tracking",
-    "logistics"
+    "logistics",
+    "api",
+    "soap",
+    "delivery"
   ],
   "author": "",
   "license": "MIT",

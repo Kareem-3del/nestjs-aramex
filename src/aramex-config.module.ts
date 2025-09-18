@@ -1,7 +1,7 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
-import { AramexConfig } from './interfaces/aramax-config.interface';
+import { AramexConfig } from './interfaces/aramex-config.interface';
 
-export const ARAMAX_CONFIG_TOKEN = 'ARAMEX_CONFIG';
+export const ARAMEX_CONFIG_TOKEN = 'ARAMEX_CONFIG';
 
 @Global()
 @Module({})
@@ -11,7 +11,7 @@ export class AramexConfigModule {
       module: AramexConfigModule,
       providers: [
         {
-          provide: ARAMAX_CONFIG_TOKEN,
+          provide: ARAMEX_CONFIG_TOKEN,
           useValue: {
             username: config.username,
             password: config.password,
@@ -25,7 +25,7 @@ export class AramexConfigModule {
           },
         },
       ],
-      exports: [ARAMAX_CONFIG_TOKEN],
+      exports: [ARAMEX_CONFIG_TOKEN],
     };
   }
 
@@ -37,7 +37,7 @@ export class AramexConfigModule {
       module: AramexConfigModule,
       providers: [
         {
-          provide: ARAMAX_CONFIG_TOKEN,
+          provide: ARAMEX_CONFIG_TOKEN,
           useFactory: async (...args: any[]) => {
             const config = await options.useFactory(...args);
             return {
@@ -55,7 +55,7 @@ export class AramexConfigModule {
           inject: options.inject || [],
         },
       ],
-      exports: [ARAMAX_CONFIG_TOKEN],
+      exports: [ARAMEX_CONFIG_TOKEN],
     };
   }
 }

@@ -1,15 +1,15 @@
 // Main module
-export { AramexModule } from './aramax.module';
-export { AramexConfigModule } from './aramax-config.module';
+export { AramexModule } from './aramex.module';
+export { AramexConfigModule } from './aramex-config.module';
 
 // Services
-export { AramexHttpService, AramexHttpException } from './services/aramax-http.service';
+export { AramexHttpService, AramexHttpException } from './services/aramex-http.service';
 export { AramexSoapService, AramexSoapException } from './services/aramex-soap.service';
 export { ShippingService } from './services/shipping.service';
 export { TrackingService } from './services/tracking.service';
 
 // Interfaces
-export { AramexConfig } from './interfaces/aramax-config.interface';
+export { AramexConfig } from './interfaces/aramex-config.interface';
 export {
   ShippingLocation,
   ShippingAddress,
@@ -45,5 +45,5 @@ export {
 export { TrackingDto, BatchTrackingDto } from './dto/tracking.dto';
 
 // Constants
-export { ARAMAX_CONFIG_TOKEN } from './aramax-config.module';
+export { ARAMEX_CONFIG_TOKEN } from './aramex-config.module';
 export { ARAMEX_ENDPOINTS, ARAMEX_BASE_URLS } from './constants/endpoints';
