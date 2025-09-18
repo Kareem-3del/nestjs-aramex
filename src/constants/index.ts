@@ -1,0 +1,1 @@
+export { ARAMEX_ENDPOINTS, ARAMEX_BASE_URLS } from './endpoints';
