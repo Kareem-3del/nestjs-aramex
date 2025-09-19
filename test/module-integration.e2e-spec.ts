@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AramexModule } from '../src/aramax.module';
-import { ARAMAX_CONFIG_TOKEN } from '../src/aramax-config.module';
+import { AramexModule } from '../src/aramex.module';
+import { ARAMEX_CONFIG_TOKEN } from '../src/aramex-config.module';
 import { TrackingService } from '../src/services/tracking.service';
-import { AramexHttpService } from '../src/services/aramax-http.service';
+import { AramexHttpService } from '../src/services/aramex-http.service';
 import { AramexSoapService } from '../src/services/aramex-soap.service';
 import { TrackingDto, BatchTrackingDto } from '../src/dto/tracking.dto';
 import { createMockAramexConfig, createMockHttpTrackingResponse } from './test-utils';
@@ -37,7 +37,7 @@ describe('Module Integration (e2e)', () => {
       const trackingService = module.get<TrackingService>(TrackingService);
       const httpService = module.get<AramexHttpService>(AramexHttpService);
       const soapService = module.get<AramexSoapService>(AramexSoapService);
-      const config = module.get(ARAMAX_CONFIG_TOKEN);
+      const config = module.get(ARAMEX_CONFIG_TOKEN);
 
       expect(trackingService).toBeDefined();
       expect(httpService).toBeDefined();
@@ -140,7 +140,7 @@ describe('Module Integration (e2e)', () => {
         ],
       }).compile();
 
-      const config = module.get(ARAMAX_CONFIG_TOKEN);
+      const config = module.get(ARAMEX_CONFIG_TOKEN);
       expect(config.sandbox).toBe(false);
       expect(config.timeout).toBe(30000);
       expect(config.debug).toBe(false);
@@ -163,7 +163,7 @@ describe('Module Integration (e2e)', () => {
         ],
       }).compile();
 
-      const config = module.get(ARAMAX_CONFIG_TOKEN);
+      const config = module.get(ARAMEX_CONFIG_TOKEN);
       expect(config.username).toBe('full_user');
       expect(config.sandbox).toBe(true);
       expect(config.timeout).toBe(45000);
@@ -186,7 +186,7 @@ describe('Module Integration (e2e)', () => {
 
       expect(configFactory).toHaveBeenCalled();
 
-      const config = module.get(ARAMAX_CONFIG_TOKEN);
+      const config = module.get(ARAMEX_CONFIG_TOKEN);
       expect(config.username).toBe('async_test_user');
       expect(config.sandbox).toBe(false);
     });

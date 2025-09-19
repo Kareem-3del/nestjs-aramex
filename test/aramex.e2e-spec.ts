@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AramexModule } from '../src/aramax.module';
-import { ARAMAX_CONFIG_TOKEN } from '../src/aramax-config.module';
+import { AramexModule } from '../src/aramex.module';
+import { ARAMEX_CONFIG_TOKEN } from '../src/aramex-config.module';
 import { TrackingService } from '../src/services/tracking.service';
 import { AramexSoapService } from '../src/services/aramex-soap.service';
-import { AramexHttpService } from '../src/services/aramax-http.service';
+import { AramexHttpService } from '../src/services/aramex-http.service';
 import { ShippingService } from '../src/services/shipping.service';
 import { createMockAramexConfig } from './test-utils';
 
@@ -188,7 +188,7 @@ describe('AramexModule (e2e)', () => {
         ],
       }).compile();
 
-      const config = testModule.get(ARAMAX_CONFIG_TOKEN);
+      const config = testModule.get(ARAMEX_CONFIG_TOKEN);
       expect(config.sandbox).toBe(false);
       expect(config.timeout).toBe(30000);
       expect(config.debug).toBe(false);
