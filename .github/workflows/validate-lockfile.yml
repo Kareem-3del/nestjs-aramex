@@ -1,0 +1,68 @@
+name: Validate Lock File
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-lockfile:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+
+    - name: Validate package-lock.json exists
+      run: |
+        if [ ! -f package-lock.json ]; then
+          echo "Error: package-lock.json is missing!"
+          echo "Please run 'npm install' to generate the lock file and commit it."
+          exit 1
+        fi
+
+    - name: Validate package-lock.json is in sync
+      run: |
+        npm ci
+        # Check if package-lock.json has been modified after npm ci
+        if ! git diff --exit-code package-lock.json; then
+          echo "Error: package-lock.json is out of sync with package.json!"
+          echo "Please run 'npm install' to update the lock file and commit the changes."
+          exit 1
+        fi
+
+    - name: Validate no package-lock.json in .gitignore
+      run: |
+        if grep -q "package-lock.json" .gitignore; then
+          echo "Error: package-lock.json should not be in .gitignore!"
+          echo "Lock files should be committed to ensure reproducible builds."
+          exit 1
+        fi
+
+  check-npm-cache:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js with cache
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Test npm cache effectiveness
+      run: |
+        echo "Installing dependencies with cache..."
+        time npm ci
+
+    - name: Verify installation
+      run: |
+        npm list --depth=0

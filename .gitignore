@@ -64,11 +64,5 @@ jspm_packages/
 # TypeScript cache
 *.tsbuildinfo
 
-# Optional package-lock file
-package-lock.json
-
-# GitHub Actions (keep workflows local only)
-.github/
-
 # Claude Code
 .claude
