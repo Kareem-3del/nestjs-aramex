@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { of, throwError } from 'rxjs';
 import { TrackingService } from './tracking.service';
-import { AramexHttpService } from './aramax-http.service';
+import { AramexHttpService } from './aramex-http.service';
 import { AramexSoapService } from './aramex-soap.service';
 import {
   createMockSoapTrackingResponse,

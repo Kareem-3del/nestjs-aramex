@@ -10,7 +10,7 @@ const aramexConfig: AramexConfig = {
   accountPin: '543543',
   username: 'testingapi@aramex.com',
   password: 'R123456789$r',
-  sandbox: false, // Set to true if using sandbox environment
+  sandbox: true, // Set to true if using sandbox environment
   timeout: 30000,
   debug: true
 };

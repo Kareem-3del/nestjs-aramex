@@ -3,7 +3,7 @@ import { Logger } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import * as soap from 'soap';
 import { AramexSoapService, AramexSoapException } from './aramex-soap.service';
-import { ARAMAX_CONFIG_TOKEN } from '../aramax-config.module';
+import { ARAMEX_CONFIG_TOKEN } from '../aramex-config.module';
 import {
   createMockAramexConfig,
   createMockSoapTrackingResponse,
@@ -32,7 +32,7 @@ describe('AramexSoapService', () => {
       providers: [
         AramexSoapService,
         {
-          provide: ARAMAX_CONFIG_TOKEN,
+          provide: ARAMEX_CONFIG_TOKEN,
           useValue: createMockAramexConfig({ debug: true }),
         },
       ],

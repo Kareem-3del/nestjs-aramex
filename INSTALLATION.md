@@ -4,7 +4,7 @@
 
 ### 1. Install the package
 ```bash
-npm install @aramax/nestjs-shipping
+npm install @kareem-3del/nestjs-aramex
 ```
 
 ### 2. Configure in your NestJS app
@@ -12,7 +12,7 @@ npm install @aramax/nestjs-shipping
 **app.module.ts**
 ```typescript
 import { Module } from '@nestjs/common';
-import { AramexModule } from '@aramax/nestjs-shipping';
+import { AramexModule } from '@kareem-3del/nestjs-aramex';
 
 @Module({
   imports: [
@@ -36,7 +36,7 @@ export class AppModule {}
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { TrackingService, ShippingService } from '@aramax/nestjs-shipping';
+import { TrackingService, ShippingService } from '@kareem-3del/nestjs-aramex';
 
 @Injectable()
 export class MyService {

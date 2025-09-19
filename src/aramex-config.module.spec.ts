@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AramexConfigModule, ARAMAX_CONFIG_TOKEN } from './aramax-config.module';
+import { AramexConfigModule, ARAMEX_CONFIG_TOKEN } from './aramex-config.module';
 import { createMockAramexConfig } from '../test/test-utils';
 
 describe('AramexConfigModule', () => {
@@ -16,11 +16,11 @@ describe('AramexConfigModule', () => {
 
       expect(module.module).toBe(AramexConfigModule);
       expect(module.providers).toHaveLength(1);
-      expect(module.exports).toEqual([ARAMAX_CONFIG_TOKEN]);
+      expect(module.exports).toEqual([ARAMEX_CONFIG_TOKEN]);
 
       const configProvider = module.providers![0];
       expect(configProvider).toMatchObject({
-        provide: ARAMAX_CONFIG_TOKEN,
+        provide: ARAMEX_CONFIG_TOKEN,
         useValue: {
           username: 'test_user_sync',
           password: 'test_password_sync',
@@ -60,7 +60,7 @@ describe('AramexConfigModule', () => {
         imports: [dynamicModule],
       }).compile();
 
-      const injectedConfig = module.get(ARAMAX_CONFIG_TOKEN);
+      const injectedConfig = module.get(ARAMEX_CONFIG_TOKEN);
       expect(injectedConfig).toBeDefined();
       expect(injectedConfig.username).toBe(config.username);
       expect(injectedConfig.password).toBe(config.password);
@@ -82,10 +82,10 @@ describe('AramexConfigModule', () => {
 
       expect(module.module).toBe(AramexConfigModule);
       expect(module.providers).toHaveLength(1);
-      expect(module.exports).toEqual([ARAMAX_CONFIG_TOKEN]);
+      expect(module.exports).toEqual([ARAMEX_CONFIG_TOKEN]);
 
       const configProvider = module.providers![0] as any;
-      expect(configProvider.provide).toBe(ARAMAX_CONFIG_TOKEN);
+      expect(configProvider.provide).toBe(ARAMEX_CONFIG_TOKEN);
       expect(configProvider.inject).toEqual(['SOME_SERVICE']);
       expect(typeof configProvider.useFactory).toBe('function');
     });
@@ -161,7 +161,7 @@ describe('AramexConfigModule', () => {
         imports: [dynamicModule],
       }).compile();
 
-      const injectedConfig = module.get(ARAMAX_CONFIG_TOKEN);
+      const injectedConfig = module.get(ARAMEX_CONFIG_TOKEN);
       expect(injectedConfig).toBeDefined();
       expect(injectedConfig.username).toBe(config.username);
     });

@@ -1,4 +1,4 @@
-import { AramexConfig } from '../src/interfaces/aramax-config.interface';
+import { AramexConfig } from '../src/interfaces/aramex-config.interface';
 import { ShipmentTrackingResponse, TrackingResult, ClientInfo } from '../src/interfaces/tracking.interface';
 
 export const createMockAramexConfig = (overrides: Partial<AramexConfig> = {}): AramexConfig => ({

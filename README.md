@@ -1,4 +1,4 @@
-# nestjs-aramex-api
+# @kareem-3del/nestjs-aramex
 
 Official NestJS library for Aramex shipping API integration, providing a clean and type-safe interface for integrating with Aramex shipping and tracking services.
 
@@ -16,7 +16,7 @@ Official NestJS library for Aramex shipping API integration, providing a clean a
 ## Installation
 
 ```bash
-npm install nestjs-aramex-api
+npm install @kareem-3del/nestjs-aramex
 ```
 
 ## Quick Start
@@ -25,7 +25,7 @@ npm install nestjs-aramex-api
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { AramexModule } from 'nestjs-aramex-api';
+import { AramexModule } from '@kareem-3del/nestjs-aramex';
 
 @Module({
   imports: [
@@ -47,7 +47,7 @@ export class AppModule {}
 ```typescript
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AramexModule } from 'nestjs-aramex-api';
+import { AramexModule } from '@kareem-3del/nestjs-aramex';
 
 @Module({
   imports: [
@@ -72,7 +72,7 @@ export class AppModule {}
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { ShippingService, TrackingService } from 'nestjs-aramex-api';
+import { ShippingService, TrackingService } from '@kareem-3del/nestjs-aramex';
 
 @Injectable()
 export class MyService {
@@ -208,7 +208,7 @@ ARAMEX_DEBUG=false
 The library provides comprehensive error handling with custom exceptions:
 
 ```typescript
-import { AramexHttpException } from 'nestjs-aramex-api';
+import { AramexHttpException } from '@kareem-3del/nestjs-aramex';
 
 try {
   const result = await this.shippingService.searchShippingServices(request).toPromise();

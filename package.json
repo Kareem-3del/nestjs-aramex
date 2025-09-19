@@ -1,7 +1,7 @@
 {
-  "name": "nestjs-aramex-api",
-  "version": "1.0.0",
-  "description": "Official NestJS library for Aramex shipping API integration with tracking and shipping services",
+  "name": "@kareem-3del/nestjs-aramex",
+  "version": "1.0.1",
+  "description": "NestJS library for Aramex shipping API integration with tracking and shipping services",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -24,6 +24,7 @@
     "logistics",
     "api",
     "soap",
+    "kareem-3del",
     "delivery"
   ],
   "author": "",

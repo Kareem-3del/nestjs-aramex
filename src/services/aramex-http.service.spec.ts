@@ -2,8 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse, AxiosError } from 'axios';
 import { of, throwError } from 'rxjs';
-import { AramexHttpService, AramexHttpException } from './aramax-http.service';
-import { ARAMAX_CONFIG_TOKEN } from '../aramax-config.module';
+import { AramexHttpService, AramexHttpException } from './aramex-http.service';
+import { ARAMEX_CONFIG_TOKEN } from '../aramex-config.module';
 import { createMockAramexConfig, MockHttpService } from '../../test/test-utils';
 import { ARAMEX_BASE_URLS } from '../constants/endpoints';
 
@@ -22,7 +22,7 @@ describe('AramexHttpService', () => {
           useValue: mockHttpService,
         },
         {
-          provide: ARAMAX_CONFIG_TOKEN,
+          provide: ARAMEX_CONFIG_TOKEN,
           useValue: createMockAramexConfig({
             sandbox: true,
             debug: true,
@@ -57,7 +57,7 @@ describe('AramexHttpService', () => {
             useValue: mockHttpService,
           },
           {
-            provide: ARAMAX_CONFIG_TOKEN,
+            provide: ARAMEX_CONFIG_TOKEN,
             useValue: createMockAramexConfig({ sandbox: false }),
           },
         ],
