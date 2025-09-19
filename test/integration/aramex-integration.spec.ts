@@ -7,6 +7,7 @@ import { AramexSoapService } from '../../src/services/aramex-soap.service';
 import { CacheManagerService } from '../../src/services/cache-manager.service';
 import { HealthMonitorService } from '../../src/services/health-monitor.service';
 import { AramexConfig } from '../../src/interfaces/aramex-config.interface';
+import { skipIfNoCredentials } from './setup';
 
 describe('Aramex Integration Tests', () => {
   let app: TestingModule;
@@ -17,20 +18,44 @@ describe('Aramex Integration Tests', () => {
   let cacheManager: CacheManagerService;
   let healthMonitor: HealthMonitorService;
 
-  // Test configuration for Aramex sandbox
-  const testConfig: AramexConfig = {
-    username: process.env.ARAMEX_USERNAME || 'testUser',
-    password: process.env.ARAMEX_PASSWORD || 'testPassword',
-    accountNumber: process.env.ARAMEX_ACCOUNT_NUMBER || '20016',
-    accountPin: process.env.ARAMEX_ACCOUNT_PIN || '221122',
-    accountEntity: process.env.ARAMEX_ACCOUNT_ENTITY || 'AMM',
-    accountCountryCode: process.env.ARAMEX_ACCOUNT_COUNTRY_CODE || 'JO',
-    sandbox: true, // Always use sandbox for integration tests
-    timeout: 30000,
-    debug: process.env.NODE_ENV === 'development',
+  const getTestConfig = (): AramexConfig | null => {
+    const requiredVars = [
+      'ARAMEX_USERNAME',
+      'ARAMEX_PASSWORD',
+      'ARAMEX_ACCOUNT_NUMBER',
+      'ARAMEX_ACCOUNT_PIN',
+      'ARAMEX_ACCOUNT_ENTITY',
+      'ARAMEX_ACCOUNT_COUNTRY_CODE'
+    ];
+
+    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+    if (missingVars.length > 0) {
+      return null;
+    }
+
+    return {
+      username: process.env.ARAMEX_USERNAME!,
+      password: process.env.ARAMEX_PASSWORD!,
+      accountNumber: process.env.ARAMEX_ACCOUNT_NUMBER!,
+      accountPin: process.env.ARAMEX_ACCOUNT_PIN!,
+      accountEntity: process.env.ARAMEX_ACCOUNT_ENTITY!,
+      accountCountryCode: process.env.ARAMEX_ACCOUNT_COUNTRY_CODE!,
+      sandbox: true, // Always use sandbox for integration tests
+      timeout: 30000,
+      debug: process.env.NODE_ENV === 'development',
+    };
   };
 
   beforeAll(async () => {
+    if (skipIfNoCredentials()) {
+      return;
+    }
+
+    const testConfig = getTestConfig();
+    if (!testConfig) {
+      throw new Error('Test config could not be created - missing credentials');
+    }
+
     app = await Test.createTestingModule({
       imports: [AramexModule.forRoot(testConfig)],
     }).compile();
@@ -44,7 +69,9 @@ describe('Aramex Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   describe('Module Integration', () => {

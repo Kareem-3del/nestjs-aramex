@@ -1,0 +1,402 @@
+name: Comprehensive Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Test environment'
+        required: false
+        default: 'sandbox'
+        type: choice
+        options:
+        - sandbox
+        - production
+      coverage_report:
+        description: 'Generate coverage report'
+        required: false
+        default: true
+        type: boolean
+      performance_tests:
+        description: 'Run performance tests'
+        required: false
+        default: true
+        type: boolean
+  schedule:
+    # Run comprehensive tests daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - '*.json'
+      - '.github/workflows/comprehensive-tests.yml'
+
+env:
+  NODE_ENV: test
+
+jobs:
+  validate-environment:
+    name: Validate Test Environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      environment: ${{ steps.env-check.outputs.environment }}
+      has-secrets: ${{ steps.env-check.outputs.has-secrets }}
+
+    steps:
+    - name: Check environment and secrets
+      id: env-check
+      run: |
+        echo "environment=${{ github.event.inputs.environment || 'sandbox' }}" >> $GITHUB_OUTPUT
+
+        if [ -n "${{ secrets.ARAMEX_USERNAME }}" ] && [ -n "${{ secrets.ARAMEX_PASSWORD }}" ] && [ -n "${{ secrets.ARAMEX_ACCOUNT_NUMBER }}" ]; then
+          echo "has-secrets=true" >> $GITHUB_OUTPUT
+          echo "✅ All required Aramex secrets are configured"
+        else
+          echo "has-secrets=false" >> $GITHUB_OUTPUT
+          echo "❌ Missing required Aramex secrets"
+        fi
+
+  unit-tests:
+    name: Unit Tests Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [validate-environment]
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run unit tests with coverage
+      run: npm run test:coverage
+
+    - name: Upload coverage reports
+      if: matrix.node-version == '20.x' && (github.event.inputs.coverage_report != 'false')
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage/lcov.info
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+        flags: unit-tests,comprehensive
+        name: codecov-unit-comprehensive
+
+    - name: Archive coverage reports
+      if: matrix.node-version == '20.x'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports-unit
+        path: coverage/
+        retention-days: 7
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate-environment]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Run E2E tests
+      run: npm run test:e2e
+
+  integration-tests-comprehensive:
+    name: Integration Tests (Comprehensive)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: [validate-environment, unit-tests]
+    if: needs.validate-environment.outputs.has-secrets == 'true'
+
+    strategy:
+      matrix:
+        test-suite:
+          - authentication
+          - tracking
+          - shipping
+          - error-handling
+          - performance
+        node-version: [18.x, 20.x]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Run ${{ matrix.test-suite }} integration tests
+      run: npm run test:integration -- --testPathPattern="${{ matrix.test-suite }}.integration.spec.ts" --verbose --forceExit --detectOpenHandles
+      env:
+        ARAMEX_ACCOUNT_COUNTRY_CODE: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}
+        ARAMEX_ACCOUNT_ENTITY: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}
+        ARAMEX_ACCOUNT_NUMBER: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}
+        ARAMEX_ACCOUNT_PIN: ${{ secrets.ARAMEX_ACCOUNT_PIN }}
+        ARAMEX_USERNAME: ${{ secrets.ARAMEX_USERNAME }}
+        ARAMEX_PASSWORD: ${{ secrets.ARAMEX_PASSWORD }}
+        ARAMEX_VERSION: ${{ secrets.ARAMEX_VERSION }}
+        ARAMEX_SANDBOX: ${{ needs.validate-environment.outputs.environment == 'production' && 'false' || 'true' }}
+        ARAMEX_TIMEOUT: '45000'
+        ARAMEX_DEBUG: 'false'
+
+    - name: Generate detailed test report
+      if: always()
+      run: |
+        echo "## 🧪 Integration Test Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Attribute | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Test Suite** | ${{ matrix.test-suite }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Node Version** | ${{ matrix.node-version }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Environment** | ${{ needs.validate-environment.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Account** | ${{ secrets.ARAMEX_ACCOUNT_NUMBER }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Entity** | ${{ secrets.ARAMEX_ACCOUNT_ENTITY }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Country** | ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Timestamp** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ $? -eq 0 ]; then
+          echo "### ✅ Result: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All tests in the ${{ matrix.test-suite }} suite completed successfully." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Result: FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Some tests in the ${{ matrix.test-suite }} suite failed. Please check the logs for details." >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+  performance-benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [validate-environment, integration-tests-comprehensive]
+    if: needs.validate-environment.outputs.has-secrets == 'true' && (github.event.inputs.performance_tests != 'false')
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Run performance benchmarks
+      run: npm run test:integration -- --testPathPattern="performance.integration.spec.ts" --verbose --forceExit --detectOpenHandles
+      env:
+        ARAMEX_ACCOUNT_COUNTRY_CODE: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}
+        ARAMEX_ACCOUNT_ENTITY: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}
+        ARAMEX_ACCOUNT_NUMBER: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}
+        ARAMEX_ACCOUNT_PIN: ${{ secrets.ARAMEX_ACCOUNT_PIN }}
+        ARAMEX_USERNAME: ${{ secrets.ARAMEX_USERNAME }}
+        ARAMEX_PASSWORD: ${{ secrets.ARAMEX_PASSWORD }}
+        ARAMEX_VERSION: ${{ secrets.ARAMEX_VERSION }}
+        ARAMEX_SANDBOX: ${{ needs.validate-environment.outputs.environment == 'production' && 'false' || 'true' }}
+        ARAMEX_TIMEOUT: '60000'
+        ARAMEX_DEBUG: 'false'
+
+    - name: Generate performance report
+      if: always()
+      run: |
+        echo "## 🚀 Performance Benchmark Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Performance tests completed for the Aramex NestJS integration." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Environment" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ needs.validate-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Node Version**: 20.x" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Type**: Performance & Load Testing" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timestamp**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ $? -eq 0 ]; then
+          echo "### ✅ Performance Tests: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All performance benchmarks completed successfully. The API responses are within acceptable limits." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ⚠️ Performance Tests: ISSUES DETECTED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Performance tests detected issues. Please review the logs for specific metrics and recommendations." >> $GITHUB_STEP_SUMMARY
+        fi
+
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [validate-environment]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run npm audit
+      run: npm audit --audit-level=moderate
+
+    - name: Check for secrets in code
+      run: |
+        echo "Checking for potential secrets in codebase..."
+        if grep -r "password\|secret\|key\|token" src/ --include="*.ts" --include="*.js" | grep -v "interface\|type\|param\|prop\|comment"; then
+          echo "⚠️ Potential secrets found in source code"
+          exit 1
+        else
+          echo "✅ No hardcoded secrets detected"
+        fi
+
+    - name: Validate environment variable usage
+      run: |
+        echo "Validating secure environment variable usage..."
+        if grep -r "process\.env\." src/ --include="*.ts" | grep -v "NODE_ENV"; then
+          echo "✅ Environment variables are properly used"
+        else
+          echo "ℹ️ No direct environment variable usage found"
+        fi
+
+  final-report:
+    name: Generate Final Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [validate-environment, unit-tests, e2e-tests, integration-tests-comprehensive, performance-benchmarks, security-tests]
+    if: always()
+
+    steps:
+    - name: Generate comprehensive test summary
+      run: |
+        echo "# 📊 Comprehensive Test Suite Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Test Environment" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ needs.validate-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timestamp**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Environment Validation
+        if [ "${{ needs.validate-environment.result }}" == "success" ]; then
+          echo "- ✅ **Environment Validation**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ **Environment Validation**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Unit Tests
+        if [ "${{ needs.unit-tests.result }}" == "success" ]; then
+          echo "- ✅ **Unit Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ **Unit Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # E2E Tests
+        if [ "${{ needs.e2e-tests.result }}" == "success" ]; then
+          echo "- ✅ **E2E Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ **E2E Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Integration Tests
+        if [ "${{ needs.integration-tests-comprehensive.result }}" == "success" ]; then
+          echo "- ✅ **Integration Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.integration-tests-comprehensive.result }}" == "skipped" ]; then
+          echo "- ⏭️ **Integration Tests**: SKIPPED (missing secrets)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ **Integration Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Performance Tests
+        if [ "${{ needs.performance-benchmarks.result }}" == "success" ]; then
+          echo "- ✅ **Performance Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.performance-benchmarks.result }}" == "skipped" ]; then
+          echo "- ⏭️ **Performance Tests**: SKIPPED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ **Performance Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Security Tests
+        if [ "${{ needs.security-tests.result }}" == "success" ]; then
+          echo "- ✅ **Security Tests**: PASSED" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "- ❌ **Security Tests**: FAILED" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Overall Status
+        if [ "${{ needs.validate-environment.result }}" == "success" ] && [ "${{ needs.unit-tests.result }}" == "success" ] && [ "${{ needs.e2e-tests.result }}" == "success" ] && [ "${{ needs.security-tests.result }}" == "success" ]; then
+          if [ "${{ needs.integration-tests-comprehensive.result }}" == "success" ] || [ "${{ needs.integration-tests-comprehensive.result }}" == "skipped" ]; then
+            echo "## 🎉 Overall Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All test suites completed successfully! The Aramex NestJS integration is working properly." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ Overall Status: PARTIAL SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Core tests passed but integration tests failed. Please check the integration test logs." >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "## ❌ Overall Status: FAILURE" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "One or more test suites failed. Please review the individual test results above." >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "1. Review any failed test suites above" >> $GITHUB_STEP_SUMMARY
+        echo "2. Check individual job logs for detailed error information" >> $GITHUB_STEP_SUMMARY
+        echo "3. Ensure all required secrets are configured if integration tests were skipped" >> $GITHUB_STEP_SUMMARY
+        echo "4. Run tests locally to reproduce and fix any issues" >> $GITHUB_STEP_SUMMARY

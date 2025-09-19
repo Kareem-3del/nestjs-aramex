@@ -5,46 +5,16 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+env:
+  NODE_ENV: test
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run tests
-      run: npm test
-
-    - name: Run coverage
-      run: npm run test:coverage
-
-    - name: Build package
-      run: npm run build
-
-    - name: Upload coverage to Codecov
-      if: matrix.node-version == '20.x'
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage/lcov.info
-        fail_ci_if_error: false
-
   lint-and-type-check:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
     - name: Checkout code
@@ -61,3 +31,205 @@ jobs:
 
     - name: Type check
       run: npx tsc --noEmit
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run unit tests
+      run: npm test
+
+    - name: Run test coverage
+      if: matrix.node-version == '20.x'
+      run: npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage/lcov.info
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+        flags: unit-tests
+        name: codecov-unit-tests
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint-and-type-check]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Run E2E tests
+      run: npm run test:e2e
+      env:
+        NODE_ENV: test
+
+  integration-tests:
+    name: Integration Tests (Aramex API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [lint-and-type-check]
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'test-integration'))
+
+    strategy:
+      matrix:
+        test-suite:
+          - authentication
+          - shipping
+          - tracking
+          - error-handling
+          - performance
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Security - Validate Aramex configuration
+      run: |
+        echo "🔒 Validating Aramex API credentials..."
+
+        # Check all required secrets without exposing values
+        MISSING_SECRETS=""
+
+        if [ -z "${{ secrets.ARAMEX_USERNAME }}" ]; then
+          MISSING_SECRETS="$MISSING_SECRETS ARAMEX_USERNAME"
+        fi
+        if [ -z "${{ secrets.ARAMEX_PASSWORD }}" ]; then
+          MISSING_SECRETS="$MISSING_SECRETS ARAMEX_PASSWORD"
+        fi
+        if [ -z "${{ secrets.ARAMEX_ACCOUNT_NUMBER }}" ]; then
+          MISSING_SECRETS="$MISSING_SECRETS ARAMEX_ACCOUNT_NUMBER"
+        fi
+        if [ -z "${{ secrets.ARAMEX_ACCOUNT_PIN }}" ]; then
+          MISSING_SECRETS="$MISSING_SECRETS ARAMEX_ACCOUNT_PIN"
+        fi
+        if [ -z "${{ secrets.ARAMEX_ACCOUNT_ENTITY }}" ]; then
+          MISSING_SECRETS="$MISSING_SECRETS ARAMEX_ACCOUNT_ENTITY"
+        fi
+        if [ -z "${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}" ]; then
+          MISSING_SECRETS="$MISSING_SECRETS ARAMEX_ACCOUNT_COUNTRY_CODE"
+        fi
+
+        if [ ! -z "$MISSING_SECRETS" ]; then
+          echo "❌ Missing required secrets:$MISSING_SECRETS"
+          echo "Integration tests cannot run without proper credentials"
+          exit 1
+        fi
+
+        echo "✅ All required Aramex secrets are configured securely"
+        echo "🔒 Credentials will be used securely in tests"
+
+    - name: Run ${{ matrix.test-suite }} integration tests
+      run: npm run test:integration -- --testPathPattern="${{ matrix.test-suite }}.integration.spec.ts" --verbose
+      env:
+        NODE_ENV: test
+        ARAMEX_ACCOUNT_COUNTRY_CODE: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}
+        ARAMEX_ACCOUNT_ENTITY: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}
+        ARAMEX_ACCOUNT_NUMBER: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}
+        ARAMEX_ACCOUNT_PIN: ${{ secrets.ARAMEX_ACCOUNT_PIN }}
+        ARAMEX_USERNAME: ${{ secrets.ARAMEX_USERNAME }}
+        ARAMEX_PASSWORD: ${{ secrets.ARAMEX_PASSWORD }}
+        ARAMEX_VERSION: ${{ secrets.ARAMEX_VERSION }}
+        ARAMEX_SANDBOX: 'true'
+        ARAMEX_TIMEOUT: '30000'
+        ARAMEX_DEBUG: 'false'
+
+    - name: Generate test report
+      if: always()
+      run: |
+        echo "## Integration Test Results - ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Test Suite**: ${{ matrix.test-suite }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment**: Sandbox" >> $GITHUB_STEP_SUMMARY
+        echo "**Account**: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Entity**: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Country**: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ $? -eq 0 ]; then
+          echo "✅ ${{ matrix.test-suite }} tests **PASSED**" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ ${{ matrix.test-suite }} tests **FAILED**" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  build-validation:
+    name: Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [unit-tests]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Validate build artifacts
+      run: |
+        ls -la dist/
+        test -f dist/index.js
+        test -f dist/index.d.ts
+        echo "Build artifacts validated successfully"
+
+    - name: Cache build artifacts
+      uses: actions/cache@v4
+      with:
+        path: dist/
+        key: build-${{ github.sha }}-${{ hashFiles('src/**/*') }}

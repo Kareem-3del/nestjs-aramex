@@ -1,31 +1,82 @@
 import 'reflect-metadata';
 
+// Security: Global flag to track if credentials are available
+let credentialsAvailable = false;
+
 // Integration test setup
 beforeAll(() => {
   // Set test environment
   process.env.NODE_ENV = 'test';
 
-  // Set default test credentials if not provided
-  if (!process.env.ARAMEX_USERNAME) {
-    process.env.ARAMEX_USERNAME = 'testUser';
+  // Validate required environment variables
+  const requiredEnvVars = [
+    'ARAMEX_USERNAME',
+    'ARAMEX_PASSWORD',
+    'ARAMEX_ACCOUNT_NUMBER',
+    'ARAMEX_ACCOUNT_PIN',
+    'ARAMEX_ACCOUNT_ENTITY',
+    'ARAMEX_ACCOUNT_COUNTRY_CODE'
+  ];
+
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    console.warn('SECURITY: Aramex credentials not configured.');
+    console.warn('Integration tests will be skipped.');
+    console.warn('To run integration tests, configure environment variables:');
+    missingVars.forEach(varName => {
+      console.warn(`  - ${varName}`);
+    });
+    credentialsAvailable = false;
+  } else {
+    credentialsAvailable = true;
+    console.log('Aramex credentials detected - integration tests will run');
   }
-  if (!process.env.ARAMEX_PASSWORD) {
-    process.env.ARAMEX_PASSWORD = 'testPassword';
+
+  // Set default sandbox mode and other configs
+  if (!process.env.ARAMEX_SANDBOX) {
+    process.env.ARAMEX_SANDBOX = 'true';
   }
-  if (!process.env.ARAMEX_ACCOUNT_NUMBER) {
-    process.env.ARAMEX_ACCOUNT_NUMBER = '20016';
+  if (!process.env.ARAMEX_TIMEOUT) {
+    process.env.ARAMEX_TIMEOUT = '30000';
   }
-  if (!process.env.ARAMEX_ACCOUNT_PIN) {
-    process.env.ARAMEX_ACCOUNT_PIN = '221122';
+  if (!process.env.ARAMEX_DEBUG) {
+    process.env.ARAMEX_DEBUG = 'false';
   }
-  if (!process.env.ARAMEX_ACCOUNT_ENTITY) {
-    process.env.ARAMEX_ACCOUNT_ENTITY = 'AMM';
-  }
-  if (!process.env.ARAMEX_ACCOUNT_COUNTRY_CODE) {
-    process.env.ARAMEX_ACCOUNT_COUNTRY_CODE = 'JO';
+
+  console.log('Integration test setup completed');
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`Sandbox mode: ${process.env.ARAMEX_SANDBOX}`);
+
+  // Only log non-sensitive configuration when credentials are available
+  if (credentialsAvailable) {
+    console.log(`Country: ${process.env.ARAMEX_ACCOUNT_COUNTRY_CODE}`);
+    console.log(`Entity: ${process.env.ARAMEX_ACCOUNT_ENTITY}`);
+    console.log('Credentials: [CONFIGURED]');
   }
 });
 
-afterAll(() => {
-  // Cleanup if needed
+// Global test configuration
+jest.setTimeout(300000); // 5 minutes for integration tests
+
+// Clean up after each test to prevent memory leaks
+afterEach(() => {
+  jest.clearAllTimers();
 });
+
+afterAll(() => {
+  console.log('Integration test cleanup completed');
+  jest.clearAllTimers();
+});
+
+// Export credentials availability for use in tests
+export const areCredentialsAvailable = () => credentialsAvailable;
+
+// Helper function to skip tests when credentials are not available
+export const skipIfNoCredentials = () => {
+  if (!credentialsAvailable) {
+    console.log('Skipping test - Aramex credentials not configured');
+    return true;
+  }
+  return false;
+};

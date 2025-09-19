@@ -1,6 +1,6 @@
 {
   "name": "@kareem-3del/nestjs-aramex",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "NestJS library for Aramex shipping API integration with tracking and shipping services",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -17,7 +17,21 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:integration": "jest --config ./test/jest-integration.json",
     "test:integration:watch": "jest --config ./test/jest-integration.json --watch",
-    "test:all": "npm run test && npm run test:e2e && npm run test:integration"
+    "test:integration:auth": "jest --config ./test/jest-integration.json --testPathPattern=authentication.integration.spec.ts",
+    "test:integration:shipping": "jest --config ./test/jest-integration.json --testPathPattern=shipping.integration.spec.ts",
+    "test:integration:tracking": "jest --config ./test/jest-integration.json --testPathPattern=tracking.integration.spec.ts",
+    "test:integration:errors": "jest --config ./test/jest-integration.json --testPathPattern=error-handling.integration.spec.ts",
+    "test:integration:performance": "jest --config ./test/jest-integration.json --testPathPattern=performance.integration.spec.ts",
+    "test:all": "npm run test && npm run test:e2e && npm run test:integration",
+    "test:comprehensive": "npm run test:coverage && npm run test:e2e && npm run test:integration",
+    "test:ci": "npm run test:coverage && npm run test:e2e",
+    "validate:env": "node scripts/validate-env.js",
+    "validate:test-env": "node scripts/test-environment.js",
+    "security:audit": "node scripts/security-audit.js",
+    "security:check": "npm audit && npm run security:audit",
+    "setup:local": "npm run validate:env && npm install && npm run build",
+    "aramex:test": "node test-aramex.ts",
+    "aramex:health": "node -e \"require('./test-aramex.ts').testAramexAPI().then(() => process.exit(0)).catch(() => process.exit(1))\""
   },
   "keywords": [
     "nestjs",

@@ -17,15 +17,15 @@ import { AramexModule } from '@kareem-3del/nestjs-aramex';
 @Module({
   imports: [
     AramexModule.forRoot({
-      accountCountryCode: 'BH',
-      accountEntity: 'BAH',
-      accountNumber: '20000068',
-      accountPin: '543543',
-      username: 'testingapi@aramex.com',
-      password: 'R123456789$r',
-      sandbox: false, // Set true for testing
+      accountCountryCode: process.env.ARAMEX_ACCOUNT_COUNTRY_CODE,
+      accountEntity: process.env.ARAMEX_ACCOUNT_ENTITY,
+      accountNumber: process.env.ARAMEX_ACCOUNT_NUMBER,
+      accountPin: process.env.ARAMEX_ACCOUNT_PIN,
+      username: process.env.ARAMEX_USERNAME,
+      password: process.env.ARAMEX_PASSWORD,
+      sandbox: true, // Set false for production
       timeout: 30000,
-      debug: true
+      debug: false
     })
   ],
 })
@@ -65,15 +65,24 @@ export class MyService {
 }
 ```
 
-## Your API Credentials (Already Configured)
+## Configuration
 
-- **Account Country**: BH
-- **Account Entity**: BAH
-- **Account Number**: 20000068
-- **Account PIN**: 543543
-- **Username**: testingapi@aramex.com
-- **Password**: R123456789$r
-- **Version**: 1.0
+⚠️ **SECURITY WARNING**: Never hardcode credentials in your source code!
+
+Create a `.env` file in your project root:
+
+```env
+ARAMEX_ACCOUNT_COUNTRY_CODE=your_country_code
+ARAMEX_ACCOUNT_ENTITY=your_entity
+ARAMEX_ACCOUNT_NUMBER=your_account_number
+ARAMEX_ACCOUNT_PIN=your_account_pin
+ARAMEX_USERNAME=your_username
+ARAMEX_PASSWORD=your_password
+ARAMEX_VERSION=1.0
+ARAMEX_SANDBOX=true
+```
+
+Then use environment variables in your configuration.
 
 ## Test Your Setup
 

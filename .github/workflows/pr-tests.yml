@@ -1,0 +1,424 @@
+name: Pull Request Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+
+env:
+  NODE_ENV: test
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      src: ${{ steps.changes.outputs.src }}
+      tests: ${{ steps.changes.outputs.tests }}
+      config: ${{ steps.changes.outputs.config }}
+      workflows: ${{ steps.changes.outputs.workflows }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Detect changes
+      uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          src:
+            - 'src/**'
+          tests:
+            - 'test/**'
+            - '**/*.spec.ts'
+            - '**/*.test.ts'
+          config:
+            - '*.json'
+            - '*.js'
+            - '*.ts'
+            - '.gitignore'
+          workflows:
+            - '.github/workflows/**'
+
+  lint-and-type-check:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Type check
+      run: npx tsc --noEmit
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [changes, lint-and-type-check]
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.config == 'true'
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run unit tests
+      run: npm test
+
+    - name: Run test coverage
+      if: matrix.node-version == '20.x'
+      run: npm run test:coverage
+
+    - name: Upload coverage to Codecov
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage/lcov.info
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+        flags: unit-tests,pr
+        name: codecov-pr-unit
+
+  build-validation:
+    name: Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.config == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Validate build artifacts
+      run: |
+        ls -la dist/
+        test -f dist/index.js
+        test -f dist/index.d.ts
+        echo "✅ Build artifacts validated successfully"
+
+    - name: Test package installation
+      run: |
+        cd /tmp
+        mkdir test-install
+        cd test-install
+        npm init -y
+        npm install $GITHUB_WORKSPACE
+        echo "✅ Package installation test passed"
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [changes, lint-and-type-check]
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Run E2E tests
+      run: npm run test:e2e
+
+  integration-tests-pr:
+    name: Integration Tests (PR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [changes, lint-and-type-check]
+    if: |
+      (needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true') &&
+      (contains(github.event.pull_request.labels.*.name, 'test-integration') ||
+       contains(github.event.pull_request.title, '[integration]') ||
+       contains(github.event.pull_request.title, '[test-all]'))
+
+    strategy:
+      matrix:
+        test-suite:
+          - authentication
+          - tracking
+          - shipping
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Check for Aramex secrets
+      id: check-secrets
+      run: |
+        if [ -n "${{ secrets.ARAMEX_USERNAME }}" ] && [ -n "${{ secrets.ARAMEX_PASSWORD }}" ] && [ -n "${{ secrets.ARAMEX_ACCOUNT_NUMBER }}" ]; then
+          echo "has-secrets=true" >> $GITHUB_OUTPUT
+          echo "✅ Aramex secrets are configured"
+        else
+          echo "has-secrets=false" >> $GITHUB_OUTPUT
+          echo "ℹ️ Aramex secrets not configured - integration tests will use fallback credentials"
+        fi
+
+    - name: Run ${{ matrix.test-suite }} integration tests
+      if: steps.check-secrets.outputs.has-secrets == 'true'
+      run: npm run test:integration -- --testPathPattern="${{ matrix.test-suite }}.integration.spec.ts" --verbose --forceExit
+      env:
+        ARAMEX_ACCOUNT_COUNTRY_CODE: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}
+        ARAMEX_ACCOUNT_ENTITY: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}
+        ARAMEX_ACCOUNT_NUMBER: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}
+        ARAMEX_ACCOUNT_PIN: ${{ secrets.ARAMEX_ACCOUNT_PIN }}
+        ARAMEX_USERNAME: ${{ secrets.ARAMEX_USERNAME }}
+        ARAMEX_PASSWORD: ${{ secrets.ARAMEX_PASSWORD }}
+        ARAMEX_VERSION: ${{ secrets.ARAMEX_VERSION }}
+        ARAMEX_SANDBOX: 'true'
+        ARAMEX_TIMEOUT: '30000'
+        ARAMEX_DEBUG: 'false'
+
+    - name: Skip integration tests - No credentials available
+      if: steps.check-secrets.outputs.has-secrets == 'false'
+      run: |
+        echo "🔒 SECURITY: Integration tests skipped - No credentials configured"
+        echo "Integration tests require proper GitHub secrets to be configured"
+        echo "Tests will pass but won't run actual API integration"
+        npm run test:integration -- --testPathPattern="${{ matrix.test-suite }}.integration.spec.ts" --verbose --forceExit
+      env:
+        NODE_ENV: 'test'
+        # NO CREDENTIALS - Tests will be skipped automatically
+
+    - name: Comment integration test results
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const testSuite = '${{ matrix.test-suite }}';
+          const success = '${{ job.status }}' === 'success';
+          const hasSecrets = '${{ steps.check-secrets.outputs.has-secrets }}' === 'true';
+
+          const emoji = success ? '✅' : '❌';
+          const status = success ? 'PASSED' : 'FAILED';
+          const credentials = hasSecrets ? 'GitHub Secrets' : 'Fallback Credentials';
+
+          const body = `## ${emoji} Integration Test Results - ${testSuite}
+
+          **Status**: ${status}
+          **Credentials**: ${credentials}
+          **Environment**: Sandbox
+
+          ${success ?
+            `The ${testSuite} integration tests completed successfully.` :
+            `The ${testSuite} integration tests failed. Please check the logs for details.`
+          }`;
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+
+  security-check:
+    name: Security Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.config == 'true'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run npm audit
+      run: npm audit --audit-level=moderate
+      continue-on-error: true
+
+    - name: Check for hardcoded secrets
+      run: |
+        echo "Checking for potential hardcoded secrets..."
+        if grep -r "password\|secret\|key\|token" src/ --include="*.ts" --include="*.js" | grep -v "interface\|type\|param\|prop\|comment\|Password\|ApiKey" | grep -v "// " | grep -v "\* "; then
+          echo "⚠️ Potential hardcoded secrets found"
+          echo "Please review the above matches and ensure no actual credentials are hardcoded"
+          exit 1
+        else
+          echo "✅ No hardcoded secrets detected"
+        fi
+
+    - name: Check file permissions
+      run: |
+        echo "Checking file permissions..."
+        find . -type f -name "*.ts" -o -name "*.js" | xargs ls -la
+        echo "✅ File permissions check completed"
+
+  pr-summary:
+    name: PR Test Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [changes, lint-and-type-check, unit-tests, build-validation, e2e-tests, integration-tests-pr, security-check]
+    if: always()
+
+    steps:
+    - name: Generate PR test summary
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const needs = ${{ toJSON(needs) }};
+
+          let summary = `# 🧪 Pull Request Test Results\n\n`;
+          summary += `## Changes Detected\n\n`;
+
+          const changes = needs.changes.outputs;
+          summary += `- **Source Code**: ${changes.src === 'true' ? '✅ Changed' : '⚪ No changes'}\n`;
+          summary += `- **Tests**: ${changes.tests === 'true' ? '✅ Changed' : '⚪ No changes'}\n`;
+          summary += `- **Configuration**: ${changes.config === 'true' ? '✅ Changed' : '⚪ No changes'}\n`;
+          summary += `- **Workflows**: ${changes.workflows === 'true' ? '✅ Changed' : '⚪ No changes'}\n\n`;
+
+          summary += `## Test Results\n\n`;
+
+          const jobs = [
+            { name: 'Lint & Type Check', key: 'lint-and-type-check' },
+            { name: 'Unit Tests', key: 'unit-tests' },
+            { name: 'Build Validation', key: 'build-validation' },
+            { name: 'E2E Tests', key: 'e2e-tests' },
+            { name: 'Integration Tests', key: 'integration-tests-pr' },
+            { name: 'Security Check', key: 'security-check' }
+          ];
+
+          for (const job of jobs) {
+            const result = needs[job.key]?.result;
+            let emoji, status;
+
+            if (result === 'success') {
+              emoji = '✅';
+              status = 'PASSED';
+            } else if (result === 'skipped') {
+              emoji = '⏭️';
+              status = 'SKIPPED';
+            } else if (result === 'failure') {
+              emoji = '❌';
+              status = 'FAILED';
+            } else {
+              emoji = '⚪';
+              status = 'NOT RUN';
+            }
+
+            summary += `- **${job.name}**: ${emoji} ${status}\n`;
+          }
+
+          // Determine overall status
+          const hasFailures = Object.values(needs).some(job => job.result === 'failure');
+          const allRequiredPassed = ['lint-and-type-check', 'unit-tests'].every(key =>
+            needs[key]?.result === 'success'
+          );
+
+          summary += `\n## Overall Status\n\n`;
+
+          if (hasFailures) {
+            summary += `❌ **SOME TESTS FAILED**\n\n`;
+            summary += `Please review the failed tests above and fix any issues before merging.\n`;
+          } else if (allRequiredPassed) {
+            summary += `✅ **ALL TESTS PASSED**\n\n`;
+            summary += `This PR is ready for review! All required tests have passed successfully.\n`;
+          } else {
+            summary += `⚠️ **INCOMPLETE**\n\n`;
+            summary += `Some required tests have not completed successfully.\n`;
+          }
+
+          summary += `\n## Next Steps\n\n`;
+          summary += `1. Review any failed tests and fix issues\n`;
+          summary += `2. Ensure all required tests pass before requesting review\n`;
+          summary += `3. Add integration test label if you want to run full integration tests\n`;
+          summary += `4. Check individual job logs for detailed information\n`;
+
+          // Create or update PR comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('Pull Request Test Results')
+          );
+
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: summary
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+          }

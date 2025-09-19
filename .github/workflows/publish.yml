@@ -42,10 +42,11 @@ jobs:
           echo "should-publish=false" >> $GITHUB_OUTPUT
         fi
 
-  publish:
+  pre-publish-validation:
     needs: check-version
     if: needs.check-version.outputs.should-publish == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
     - name: Checkout code
@@ -61,8 +62,60 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Run tests
+    - name: Run unit tests
       run: npm test
+
+    - name: Run test coverage
+      run: npm run test:coverage
+
+    - name: Run E2E tests
+      run: npm run test:e2e
+
+    - name: Run integration tests with secrets
+      run: npm run test:integration
+      env:
+        NODE_ENV: test
+        ARAMEX_ACCOUNT_COUNTRY_CODE: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}
+        ARAMEX_ACCOUNT_ENTITY: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}
+        ARAMEX_ACCOUNT_NUMBER: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}
+        ARAMEX_ACCOUNT_PIN: ${{ secrets.ARAMEX_ACCOUNT_PIN }}
+        ARAMEX_USERNAME: ${{ secrets.ARAMEX_USERNAME }}
+        ARAMEX_PASSWORD: ${{ secrets.ARAMEX_PASSWORD }}
+        ARAMEX_VERSION: ${{ secrets.ARAMEX_VERSION }}
+        ARAMEX_SANDBOX: 'true'
+
+    - name: Build package
+      run: npm run build
+
+    - name: Validate build artifacts
+      run: |
+        ls -la dist/
+        test -f dist/index.js
+        test -f dist/index.d.ts
+        echo "Build artifacts validated successfully"
+
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+
+  publish:
+    needs: [check-version, pre-publish-validation]
+    if: needs.check-version.outputs.should-publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        registry-url: 'https://registry.npmjs.org'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
 
     - name: Build package
       run: npm run build

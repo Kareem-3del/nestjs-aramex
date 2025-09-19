@@ -44,6 +44,10 @@ export {
 } from './dto/shipping-search.dto';
 export { TrackingDto, BatchTrackingDto } from './dto/tracking.dto';
 
+// Configuration utilities
+export { AramexConfigService } from './config/aramex-config.service';
+export { validateAramexConfig, createConfigFromEnvironment, AramexConfigValidator } from './config/aramex-config.validator';
+
 // Constants
 export { ARAMEX_CONFIG_TOKEN } from './aramex-config.module';
 export { ARAMEX_ENDPOINTS, ARAMEX_BASE_URLS } from './constants/endpoints';

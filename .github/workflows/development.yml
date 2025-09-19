@@ -1,0 +1,157 @@
+name: Development Support
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of test to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - unit
+        - integration
+        - e2e
+        - performance
+      environment:
+        description: 'Environment to test against'
+        required: false
+        default: 'sandbox'
+        type: choice
+        options:
+        - sandbox
+        - production
+      debug_mode:
+        description: 'Enable debug logging'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_ENV: test
+
+jobs:
+  development-test:
+    name: Development Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build package
+      run: npm run build
+
+    - name: Run unit tests
+      if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'unit'
+      run: npm test
+
+    - name: Run E2E tests
+      if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'e2e'
+      run: npm run test:e2e
+
+    - name: Run integration tests
+      if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'integration'
+      run: npm run test:integration
+      env:
+        ARAMEX_ACCOUNT_COUNTRY_CODE: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}
+        ARAMEX_ACCOUNT_ENTITY: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}
+        ARAMEX_ACCOUNT_NUMBER: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}
+        ARAMEX_ACCOUNT_PIN: ${{ secrets.ARAMEX_ACCOUNT_PIN }}
+        ARAMEX_USERNAME: ${{ secrets.ARAMEX_USERNAME }}
+        ARAMEX_PASSWORD: ${{ secrets.ARAMEX_PASSWORD }}
+        ARAMEX_VERSION: ${{ secrets.ARAMEX_VERSION }}
+        ARAMEX_SANDBOX: ${{ github.event.inputs.environment == 'production' && 'false' || 'true' }}
+        ARAMEX_DEBUG: ${{ github.event.inputs.debug_mode }}
+        ARAMEX_TIMEOUT: '30000'
+
+    - name: Run performance tests
+      if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'performance'
+      run: |
+        echo "Running performance tests..."
+        time npm run test:integration
+        echo "Performance test completed"
+      env:
+        ARAMEX_ACCOUNT_COUNTRY_CODE: ${{ secrets.ARAMEX_ACCOUNT_COUNTRY_CODE }}
+        ARAMEX_ACCOUNT_ENTITY: ${{ secrets.ARAMEX_ACCOUNT_ENTITY }}
+        ARAMEX_ACCOUNT_NUMBER: ${{ secrets.ARAMEX_ACCOUNT_NUMBER }}
+        ARAMEX_ACCOUNT_PIN: ${{ secrets.ARAMEX_ACCOUNT_PIN }}
+        ARAMEX_USERNAME: ${{ secrets.ARAMEX_USERNAME }}
+        ARAMEX_PASSWORD: ${{ secrets.ARAMEX_PASSWORD }}
+        ARAMEX_VERSION: ${{ secrets.ARAMEX_VERSION }}
+        ARAMEX_SANDBOX: ${{ github.event.inputs.environment == 'production' && 'false' || 'true' }}
+        ARAMEX_DEBUG: ${{ github.event.inputs.debug_mode }}
+        ARAMEX_TIMEOUT: '30000'
+
+    - name: Generate test report
+      if: always()
+      run: |
+        echo "## Development Test Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Type**: ${{ github.event.inputs.test_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Debug Mode**: ${{ github.event.inputs.debug_mode }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Triggered by**: @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Test execution completed at $(date)" >> $GITHUB_STEP_SUMMARY
+
+  environment-setup:
+    name: Environment Setup Guide
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Generate setup guide
+      run: |
+        echo "## Environment Setup Guide" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Required GitHub Secrets" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "The following secrets must be configured in your repository:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### Aramex API Credentials" >> $GITHUB_STEP_SUMMARY
+        echo "- \`ARAMEX_ACCOUNT_COUNTRY_CODE\` - Account country code (e.g., BH)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`ARAMEX_ACCOUNT_ENTITY\` - Account entity (e.g., BAH)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`ARAMEX_ACCOUNT_NUMBER\` - Account number" >> $GITHUB_STEP_SUMMARY
+        echo "- \`ARAMEX_ACCOUNT_PIN\` - Account PIN" >> $GITHUB_STEP_SUMMARY
+        echo "- \`ARAMEX_USERNAME\` - API username" >> $GITHUB_STEP_SUMMARY
+        echo "- \`ARAMEX_PASSWORD\` - API password" >> $GITHUB_STEP_SUMMARY
+        echo "- \`ARAMEX_VERSION\` - API version (e.g., 1.0)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "#### Additional Secrets" >> $GITHUB_STEP_SUMMARY
+        echo "- \`NPM_TOKEN\` - NPM authentication token for publishing" >> $GITHUB_STEP_SUMMARY
+        echo "- \`CODECOV_TOKEN\` - Codecov token for coverage reporting" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Local Development" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "For local development, create a \`.env\` file with the same variables:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_ACCOUNT_COUNTRY_CODE=BH" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_ACCOUNT_ENTITY=BAH" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_ACCOUNT_NUMBER=your_account_number" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_ACCOUNT_PIN=your_pin" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_USERNAME=your_username" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_PASSWORD=your_password" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_VERSION=1.0" >> $GITHUB_STEP_SUMMARY
+        echo "ARAMEX_SANDBOX=true" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Testing Commands" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- \`npm test\` - Run unit tests" >> $GITHUB_STEP_SUMMARY
+        echo "- \`npm run test:e2e\` - Run E2E tests" >> $GITHUB_STEP_SUMMARY
+        echo "- \`npm run test:integration\` - Run integration tests" >> $GITHUB_STEP_SUMMARY
+        echo "- \`npm run test:all\` - Run all tests" >> $GITHUB_STEP_SUMMARY
+        echo "- \`npm run test:coverage\` - Run tests with coverage" >> $GITHUB_STEP_SUMMARY

@@ -2,12 +2,12 @@ import { AramexConfig } from '../src/interfaces/aramex-config.interface';
 import { ShipmentTrackingResponse, TrackingResult, ClientInfo } from '../src/interfaces/tracking.interface';
 
 export const createMockAramexConfig = (overrides: Partial<AramexConfig> = {}): AramexConfig => ({
-  username: 'test_user',
-  password: 'test_password',
-  accountNumber: '123456',
-  accountPin: '1234',
-  accountEntity: 'TEST',
-  accountCountryCode: 'US',
+  username: 'mock_user',
+  password: 'mock_password',
+  accountNumber: 'mock_account',
+  accountPin: 'mock_pin',
+  accountEntity: 'MOCK',
+  accountCountryCode: 'XX',
   sandbox: true,
   timeout: 30000,
   debug: false,
@@ -15,13 +15,13 @@ export const createMockAramexConfig = (overrides: Partial<AramexConfig> = {}): A
 });
 
 export const createMockClientInfo = (overrides: Partial<ClientInfo> = {}): ClientInfo => ({
-  UserName: 'test_user',
-  Password: 'test_password',
+  UserName: 'mock_user',
+  Password: 'mock_password',
   Version: 'v1.0',
-  AccountNumber: '123456',
-  AccountPin: '1234',
-  AccountEntity: 'TEST',
-  AccountCountryCode: 'US',
+  AccountNumber: 'mock_account',
+  AccountPin: 'mock_pin',
+  AccountEntity: 'MOCK',
+  AccountCountryCode: 'XX',
   ...overrides,
 });
 

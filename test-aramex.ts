@@ -2,14 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { AramexModule, AramexConfig, TrackingService, ShippingService } from './src';
 
-// Configuration with your credentials
+// SECURITY: Configuration from environment variables only
+if (!process.env.ARAMEX_USERNAME || !process.env.ARAMEX_PASSWORD) {
+  console.error('❌ Missing required environment variables');
+  console.error('Please configure ARAMEX_USERNAME, ARAMEX_PASSWORD, and other credentials in your .env file');
+  process.exit(1);
+}
+
 const aramexConfig: AramexConfig = {
-  accountCountryCode: 'BH',
-  accountEntity: 'BAH',
-  accountNumber: '20000068',
-  accountPin: '543543',
-  username: 'testingapi@aramex.com',
-  password: 'R123456789$r',
+  accountCountryCode: process.env.ARAMEX_ACCOUNT_COUNTRY_CODE!,
+  accountEntity: process.env.ARAMEX_ACCOUNT_ENTITY!,
+  accountNumber: process.env.ARAMEX_ACCOUNT_NUMBER!,
+  accountPin: process.env.ARAMEX_ACCOUNT_PIN!,
+  username: process.env.ARAMEX_USERNAME!,
+  password: process.env.ARAMEX_PASSWORD!,
   sandbox: true, // Set to true if using sandbox environment
   timeout: 30000,
   debug: true
