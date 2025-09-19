@@ -14,7 +14,7 @@ const aramexConfig: AramexConfig = {
   timeout: 30000,
   debug: true
 };
-9s
+
 @Module({
   imports: [
     AramexModule.forRoot(aramexConfig)
@@ -86,7 +86,7 @@ async function testAramexAPI() {
 }
 
 // Run the test
-if (require.main === module) {Run npm run test:coverage
+if (require.main === module) {
   testAramexAPI().catch(console.error);
 }
 

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { of, throwError } from 'rxjs';
 import { ShippingService } from './shipping.service';
 import { AramexHttpService } from './aramex-http.service';
+import { CacheManagerService } from './cache-manager.service';
 import { ShippingSearchDto } from '../dto/shipping-search.dto';
 import { RateCalculationResponse } from '../interfaces/shipping.interface';
 import { createMockClientInfo } from '../../test/test-utils';
@@ -73,6 +74,7 @@ describe('ShippingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ShippingService,
+        CacheManagerService,
         {
           provide: AramexHttpService,
           useValue: mockHttp,

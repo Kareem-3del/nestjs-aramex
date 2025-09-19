@@ -3,6 +3,7 @@ import { of, throwError } from 'rxjs';
 import { TrackingService } from './tracking.service';
 import { AramexHttpService } from './aramex-http.service';
 import { AramexSoapService } from './aramex-soap.service';
+import { CacheManagerService } from './cache-manager.service';
 import {
   createMockSoapTrackingResponse,
   createMockTrackingResult,
@@ -29,6 +30,7 @@ describe('TrackingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TrackingService,
+        CacheManagerService,
         {
           provide: AramexHttpService,
           useValue: mockHttp,

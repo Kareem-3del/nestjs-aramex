@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { AramexHttpService } from './aramex-http.service';
 import { AramexSoapService } from './aramex-soap.service';
+import { CacheManagerService } from './cache-manager.service';
 import {
   TrackingRequest,
   TrackingResponse,
@@ -19,7 +20,8 @@ export class TrackingService {
 
   constructor(
     private readonly httpService: AramexHttpService,
-    private readonly soapService: AramexSoapService
+    private readonly soapService: AramexSoapService,
+    private readonly cacheManager: CacheManagerService
   ) {}
 
   /**
@@ -28,14 +30,19 @@ export class TrackingService {
   trackPackage(trackingRequest: TrackingDto): Observable<TrackingResponse> {
     this.logger.debug('Tracking package', trackingRequest);
 
-    if (trackingRequest.useSoap === false) {
-      return this.trackMultiplePackagesHttp([trackingRequest.trackingNumber]).pipe(
-        map((responses) => responses[0] || this.createEmptyTrackingResponse(trackingRequest.trackingNumber))
-      );
-    }
+    return this.cacheManager.cacheTrackingData(
+      trackingRequest.trackingNumber,
+      () => {
+        if (trackingRequest.useSoap === false) {
+          return this.trackMultiplePackagesHttp([trackingRequest.trackingNumber]).pipe(
+            map((responses) => responses[0] || this.createEmptyTrackingResponse(trackingRequest.trackingNumber))
+          );
+        }
 
-    return this.trackMultiplePackages([trackingRequest.trackingNumber]).pipe(
-      map((responses) => responses[0] || this.createEmptyTrackingResponse(trackingRequest.trackingNumber))
+        return this.trackMultiplePackages([trackingRequest.trackingNumber]).pipe(
+          map((responses) => responses[0] || this.createEmptyTrackingResponse(trackingRequest.trackingNumber))
+        );
+      }
     );
   }
 

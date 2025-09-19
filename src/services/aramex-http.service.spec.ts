@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { AxiosResponse, AxiosError } from 'axios';
 import { of, throwError } from 'rxjs';
 import { AramexHttpService, AramexHttpException } from './aramex-http.service';
+import { RateLimiterService } from './rate-limiter.service';
 import { ARAMEX_CONFIG_TOKEN } from '../aramex-config.module';
 import { createMockAramexConfig, MockHttpService } from '../../test/test-utils';
 import { ARAMEX_BASE_URLS } from '../constants/endpoints';
@@ -17,6 +18,7 @@ describe('AramexHttpService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AramexHttpService,
+        RateLimiterService,
         {
           provide: HttpService,
           useValue: mockHttpService,
@@ -52,6 +54,7 @@ describe('AramexHttpService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AramexHttpService,
+          RateLimiterService,
           {
             provide: HttpService,
             useValue: mockHttpService,
@@ -465,6 +468,7 @@ describe('AramexHttpService', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AramexHttpService,
+          RateLimiterService,
           {
             provide: HttpService,
             useValue: mockHttpService,

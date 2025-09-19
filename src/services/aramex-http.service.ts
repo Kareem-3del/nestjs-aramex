@@ -112,10 +112,12 @@ export class AramexHttpService {
       this.logger.debug(`PUT ${url}`, { data, config: requestConfig });
     }
 
-    return this.httpService.put<T>(url, data, requestConfig).pipe(
-      timeout(this.config.timeout),
-      map((response: AxiosResponse<T>) => response.data),
-      catchError(this.handleError),
+    return this.rateLimiter.executeWithRateLimit(() =>
+      this.httpService.put<T>(url, data, requestConfig).pipe(
+        timeout(this.config.timeout),
+        map((response: AxiosResponse<T>) => response.data),
+        catchError(this.handleError),
+      )
     );
   }
 
@@ -126,10 +128,12 @@ export class AramexHttpService {
       this.logger.debug(`DELETE ${url}`, requestConfig);
     }
 
-    return this.httpService.delete<T>(url, requestConfig).pipe(
-      timeout(this.config.timeout),
-      map((response: AxiosResponse<T>) => response.data),
-      catchError(this.handleError),
+    return this.rateLimiter.executeWithRateLimit(() =>
+      this.httpService.delete<T>(url, requestConfig).pipe(
+        timeout(this.config.timeout),
+        map((response: AxiosResponse<T>) => response.data),
+        catchError(this.handleError),
+      )
     );
   }
 }

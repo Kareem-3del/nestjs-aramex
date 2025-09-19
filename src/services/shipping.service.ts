@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { AramexHttpService } from './aramex-http.service';
+import { CacheManagerService } from './cache-manager.service';
 import {
   ShippingSearchRequest,
   ShippingSearchResponse,
@@ -17,7 +18,10 @@ import { ARAMEX_ENDPOINTS } from '../constants/endpoints';
 export class ShippingService {
   private readonly logger = new Logger(ShippingService.name);
 
-  constructor(private readonly httpService: AramexHttpService) {}
+  constructor(
+    private readonly httpService: AramexHttpService,
+    private readonly cacheManager: CacheManagerService
+  ) {}
 
   /**
    * Calculate shipping rates using Aramex API
@@ -26,21 +30,29 @@ export class ShippingService {
     this.logger.debug('Calculating shipping rates', searchRequest);
 
     const aramexRequest: RateCalculationRequest = this.mapToAramexRequest(searchRequest);
+    const packageHash = this.cacheManager.generateHash(aramexRequest.shipmentDetails);
 
-    const payload = {
-      ClientInfo: this.httpService.getClientInfo(),
-      Transaction: null,
-      OriginAddress: aramexRequest.originAddress,
-      DestinationAddress: aramexRequest.destinationAddress,
-      ShipmentDetails: aramexRequest.shipmentDetails,
-    };
+    return this.cacheManager.cacheShippingRates(
+      `${aramexRequest.originAddress.city},${aramexRequest.originAddress.countryCode}`,
+      `${aramexRequest.destinationAddress.city},${aramexRequest.destinationAddress.countryCode}`,
+      packageHash,
+      () => {
+        const payload = {
+          ClientInfo: this.httpService.getClientInfo(),
+          Transaction: null,
+          OriginAddress: aramexRequest.originAddress,
+          DestinationAddress: aramexRequest.destinationAddress,
+          ShipmentDetails: aramexRequest.shipmentDetails,
+        };
 
-    return this.httpService.post<RateCalculationResponse>(ARAMEX_ENDPOINTS.SHIPPING.CALCULATE_RATE, payload).pipe(
-      map((response) => this.mapAramexRateResponse(response)),
-      catchError((error) => {
-        this.logger.error('Failed to calculate shipping rates', error);
-        throw error;
-      }),
+        return this.httpService.post<RateCalculationResponse>(ARAMEX_ENDPOINTS.SHIPPING.CALCULATE_RATE, payload).pipe(
+          map((response) => this.mapAramexRateResponse(response)),
+          catchError((error) => {
+            this.logger.error('Failed to calculate shipping rates', error);
+            throw error;
+          }),
+        );
+      }
     );
   }
 

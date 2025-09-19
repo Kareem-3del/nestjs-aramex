@@ -5,6 +5,9 @@ import { AramexHttpService } from './services/aramex-http.service';
 import { AramexSoapService } from './services/aramex-soap.service';
 import { ShippingService } from './services/shipping.service';
 import { TrackingService } from './services/tracking.service';
+import { RateLimiterService } from './services/rate-limiter.service';
+import { CacheManagerService } from './services/cache-manager.service';
+import { HealthMonitorService } from './services/health-monitor.service';
 import { AramexConfig } from './interfaces/aramex-config.interface';
 
 @Module({})
@@ -19,6 +22,9 @@ export class AramexModule {
         AramexConfigModule.forRoot(config),
       ],
       providers: [
+        CacheManagerService,
+        RateLimiterService,
+        HealthMonitorService,
         AramexHttpService,
         AramexSoapService,
         ShippingService,
@@ -29,6 +35,8 @@ export class AramexModule {
         TrackingService,
         AramexHttpService,
         AramexSoapService,
+        CacheManagerService,
+        HealthMonitorService,
       ],
     };
   }
@@ -46,6 +54,9 @@ export class AramexModule {
         AramexConfigModule.forRootAsync(options),
       ],
       providers: [
+        CacheManagerService,
+        RateLimiterService,
+        HealthMonitorService,
         AramexHttpService,
         AramexSoapService,
         ShippingService,
@@ -56,6 +67,8 @@ export class AramexModule {
         TrackingService,
         AramexHttpService,
         AramexSoapService,
+        CacheManagerService,
+        HealthMonitorService,
       ],
     };
   }

@@ -4,6 +4,9 @@ import { AramexHttpService } from './services/aramex-http.service';
 import { AramexSoapService } from './services/aramex-soap.service';
 import { ShippingService } from './services/shipping.service';
 import { TrackingService } from './services/tracking.service';
+import { CacheManagerService } from './services/cache-manager.service';
+import { RateLimiterService } from './services/rate-limiter.service';
+import { HealthMonitorService } from './services/health-monitor.service';
 import { AramexConfig } from './interfaces/aramex-config.interface';
 
 describe('AramexModule', () => {
@@ -36,6 +39,9 @@ describe('AramexModule', () => {
       expect(dynamicModule.module).toBe(AramexModule);
       expect(dynamicModule.imports).toHaveLength(2);
       expect(dynamicModule.providers).toEqual([
+        CacheManagerService,
+        RateLimiterService,
+        HealthMonitorService,
         AramexHttpService,
         AramexSoapService,
         ShippingService,
@@ -46,6 +52,8 @@ describe('AramexModule', () => {
         TrackingService,
         AramexHttpService,
         AramexSoapService,
+        CacheManagerService,
+        HealthMonitorService,
       ]);
     });
 
@@ -55,6 +63,9 @@ describe('AramexModule', () => {
       expect(dynamicModule.module).toBe(AramexModule);
       expect(dynamicModule.imports).toHaveLength(2);
       expect(dynamicModule.providers).toEqual([
+        CacheManagerService,
+        RateLimiterService,
+        HealthMonitorService,
         AramexHttpService,
         AramexSoapService,
         ShippingService,
@@ -65,6 +76,8 @@ describe('AramexModule', () => {
         TrackingService,
         AramexHttpService,
         AramexSoapService,
+        CacheManagerService,
+        HealthMonitorService,
       ]);
     });
 
@@ -78,6 +91,8 @@ describe('AramexModule', () => {
       expect(module.get(TrackingService)).toBeDefined();
       expect(module.get(AramexHttpService)).toBeDefined();
       expect(module.get(AramexSoapService)).toBeDefined();
+      expect(module.get(CacheManagerService)).toBeDefined();
+      expect(module.get(HealthMonitorService)).toBeDefined();
     });
   });
 
@@ -93,6 +108,9 @@ describe('AramexModule', () => {
       expect(dynamicModule.module).toBe(AramexModule);
       expect(dynamicModule.imports).toHaveLength(2);
       expect(dynamicModule.providers).toEqual([
+        CacheManagerService,
+        RateLimiterService,
+        HealthMonitorService,
         AramexHttpService,
         AramexSoapService,
         ShippingService,
@@ -103,6 +121,8 @@ describe('AramexModule', () => {
         TrackingService,
         AramexHttpService,
         AramexSoapService,
+        CacheManagerService,
+        HealthMonitorService,
       ]);
     });
 
@@ -120,6 +140,9 @@ describe('AramexModule', () => {
       expect(dynamicModule.module).toBe(AramexModule);
       expect(dynamicModule.imports).toHaveLength(2);
       expect(dynamicModule.providers).toEqual([
+        CacheManagerService,
+        RateLimiterService,
+        HealthMonitorService,
         AramexHttpService,
         AramexSoapService,
         ShippingService,
@@ -130,6 +153,8 @@ describe('AramexModule', () => {
         TrackingService,
         AramexHttpService,
         AramexSoapService,
+        CacheManagerService,
+        HealthMonitorService,
       ]);
     });
 
@@ -157,8 +182,8 @@ describe('AramexModule', () => {
 
       const module = AramexModule.forRoot(minimalConfig);
       expect(module.module).toBe(AramexModule);
-      expect(module.providers).toHaveLength(4);
-      expect(module.exports).toHaveLength(4);
+      expect(module.providers).toHaveLength(7);
+      expect(module.exports).toHaveLength(6);
     });
 
     it('should create a working async module instance', async () => {
@@ -176,6 +201,8 @@ describe('AramexModule', () => {
       expect(module.get(TrackingService)).toBeDefined();
       expect(module.get(AramexHttpService)).toBeDefined();
       expect(module.get(AramexSoapService)).toBeDefined();
+      expect(module.get(CacheManagerService)).toBeDefined();
+      expect(module.get(HealthMonitorService)).toBeDefined();
     });
 
     it('should handle async configuration with Promise', async () => {
