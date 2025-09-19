@@ -4,7 +4,7 @@ import { ShippingService } from '../../src';
 import { AramexConfig } from '../../src';
 import { CacheManagerService } from '../../src/services/cache-manager.service';
 import { HealthMonitorService } from '../../src/services/health-monitor.service';
-import { skipIfNoCredentials } from './setup';
+import { skipIfNoCredentials, areCredentialsAvailable, describeIf, itIf } from './setup';
 
 describe('Shipping Service Integration Tests', () => {
   let app: TestingModule;
@@ -47,7 +47,8 @@ describe('Shipping Service Integration Tests', () => {
 
     const testConfig = getTestConfig();
     if (!testConfig) {
-      throw new Error('Test config could not be created - missing credentials');
+      console.warn('Test config could not be created - missing credentials');
+      return;
     }
 
     app = await Test.createTestingModule({
@@ -60,10 +61,12 @@ describe('Shipping Service Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
-  describe('Rate Calculation Tests', () => {
+  describeIf(areCredentialsAvailable(), 'Rate Calculation Tests', () => {
     const validShippingRequest = {
       origin: {
         country: 'BH',
@@ -91,6 +94,9 @@ describe('Shipping Service Integration Tests', () => {
     };
 
     it('should calculate shipping rates for valid domestic request (BH to AE)', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const response = await shippingService.calculateRates(validShippingRequest).toPromise();
 
       expect(response).toBeDefined();
@@ -116,6 +122,9 @@ describe('Shipping Service Integration Tests', () => {
     }, 30000);
 
     it('should calculate rates for different package sizes', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const smallPackage = {
         ...validShippingRequest,
         packageDetails: {
@@ -162,6 +171,9 @@ describe('Shipping Service Integration Tests', () => {
     }, 45000);
 
     it('should handle international shipping rates (BH to US)', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const internationalRequest = {
         ...validShippingRequest,
         destination: {
@@ -188,7 +200,7 @@ describe('Shipping Service Integration Tests', () => {
     }, 30000);
   });
 
-  describe('Shipping Service Search Tests', () => {
+  describeIf(areCredentialsAvailable(), 'Shipping Service Search Tests', () => {
     const searchRequest = {
       origin: {
         country: 'BH',
@@ -216,6 +228,9 @@ describe('Shipping Service Integration Tests', () => {
     };
 
     it('should search available shipping services', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const response = await shippingService.searchShippingServices(searchRequest).toPromise();
 
       expect(response).toBeDefined();
@@ -232,6 +247,9 @@ describe('Shipping Service Integration Tests', () => {
     }, 30000);
 
     it('should filter services by criteria', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const response = await shippingService.searchShippingServices({
         ...searchRequest,
         serviceType: 'express',
@@ -247,7 +265,7 @@ describe('Shipping Service Integration Tests', () => {
     }, 30000);
   });
 
-  describe('Caching Tests', () => {
+  describeIf(areCredentialsAvailable(), 'Caching Tests', () => {
     const cacheTestRequest = {
       origin: {
         country: 'BH',
@@ -275,6 +293,9 @@ describe('Shipping Service Integration Tests', () => {
     };
 
     it('should cache shipping rate responses', async () => {
+      if (!shippingService || !cacheManager) {
+        throw new Error('Services not initialized - credentials may be missing');
+      }
       // Clear cache first
       cacheManager.clear();
 
@@ -296,8 +317,11 @@ describe('Shipping Service Integration Tests', () => {
     }, 45000);
   });
 
-  describe('Error Handling Tests', () => {
+  describeIf(areCredentialsAvailable(), 'Error Handling Tests', () => {
     it('should handle invalid origin country', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const invalidRequest = {
         origin: {
           country: 'INVALID',
@@ -333,6 +357,9 @@ describe('Shipping Service Integration Tests', () => {
     }, 30000);
 
     it('should handle zero weight packages', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const zeroWeightRequest = {
         origin: {
           country: 'BH',
@@ -367,6 +394,9 @@ describe('Shipping Service Integration Tests', () => {
     }, 30000);
 
     it('should handle oversized packages', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const oversizedRequest = {
         origin: {
           country: 'BH',
@@ -403,8 +433,11 @@ describe('Shipping Service Integration Tests', () => {
     }, 30000);
   });
 
-  describe('Performance Tests', () => {
+  describeIf(areCredentialsAvailable(), 'Performance Tests', () => {
     it('should handle concurrent rate calculations', async () => {
+      if (!shippingService) {
+        throw new Error('ShippingService not initialized - credentials may be missing');
+      }
       const concurrentRequests = 3; // Reduced for API rate limits
       const requests = [];
 
@@ -452,6 +485,9 @@ describe('Shipping Service Integration Tests', () => {
     }, 120000);
 
     it('should maintain performance metrics', async () => {
+      if (!shippingService || !healthMonitor) {
+        throw new Error('Services not initialized - credentials may be missing');
+      }
       // Make a few requests to generate metrics
       const testRequest = {
         origin: {

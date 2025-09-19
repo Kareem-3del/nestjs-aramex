@@ -4,7 +4,7 @@ import { TrackingService } from '../../src/services/tracking.service';
 import { AramexConfig } from '../../src/interfaces/aramex-config.interface';
 import { CacheManagerService } from '../../src/services/cache-manager.service';
 import { HealthMonitorService } from '../../src/services/health-monitor.service';
-import { skipIfNoCredentials } from './setup';
+import { skipIfNoCredentials, areCredentialsAvailable, describeIf } from './setup';
 
 describe('Tracking Service Integration Tests', () => {
   let app: TestingModule;
@@ -47,7 +47,8 @@ describe('Tracking Service Integration Tests', () => {
 
     const testConfig = getTestConfig();
     if (!testConfig) {
-      throw new Error('Test config could not be created - missing credentials');
+      console.warn('Test config could not be created - missing credentials');
+      return;
     }
 
     app = await Test.createTestingModule({
@@ -60,10 +61,12 @@ describe('Tracking Service Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
-  describe('SOAP Tracking Tests', () => {
+  describeIf(areCredentialsAvailable(), 'SOAP Tracking Tests', () => {
     const testTrackingNumbers = [
       '47384974350', // Known test tracking number
       '1234567890',  // Generic test number
@@ -71,6 +74,9 @@ describe('Tracking Service Integration Tests', () => {
     ];
 
     it('should track package using SOAP service', async () => {
+      if (!trackingService) {
+        throw new Error('TrackingService not initialized - credentials may be missing');
+      }
       const trackingNumber = testTrackingNumbers[0];
       const response = await trackingService.trackPackage({
         trackingNumber,
@@ -97,6 +103,9 @@ describe('Tracking Service Integration Tests', () => {
     }, 30000);
 
     it('should handle SOAP service timeouts gracefully', async () => {
+      if (!trackingService) {
+        throw new Error('TrackingService not initialized - credentials may be missing');
+      }
       const response = await trackingService.trackPackage({
         trackingNumber: 'TIMEOUT_TEST_123',
         useSoap: true,
@@ -108,7 +117,7 @@ describe('Tracking Service Integration Tests', () => {
     }, 35000);
   });
 
-  describe('HTTP Tracking Tests', () => {
+  describeIf(areCredentialsAvailable(), 'HTTP Tracking Tests', () => {
     const testTrackingNumbers = [
       '47384974350',
       'HTTP_TEST_123',
@@ -116,6 +125,9 @@ describe('Tracking Service Integration Tests', () => {
     ];
 
     it('should track package using HTTP service', async () => {
+      if (!trackingService) {
+        throw new Error('TrackingService not initialized - credentials may be missing');
+      }
       const trackingNumber = testTrackingNumbers[0];
       const response = await trackingService.trackPackage({
         trackingNumber,
@@ -142,6 +154,9 @@ describe('Tracking Service Integration Tests', () => {
     }, 30000);
 
     it('should prefer HTTP service by default', async () => {
+      if (!trackingService) {
+        throw new Error('TrackingService not initialized - credentials may be missing');
+      }
       const response = await trackingService.trackPackage({
         trackingNumber: testTrackingNumbers[1],
         // useSoap not specified, should default to false
@@ -153,7 +168,7 @@ describe('Tracking Service Integration Tests', () => {
     }, 30000);
   });
 
-  describe('Batch Tracking Tests', () => {
+  describeIf(areCredentialsAvailable(), 'Batch Tracking Tests', () => {
     const batchTrackingNumbers = [
       '47384974350',
       '1234567890',
@@ -163,6 +178,9 @@ describe('Tracking Service Integration Tests', () => {
     ];
 
     it('should track multiple packages simultaneously', async () => {
+      if (!trackingService) {
+        throw new Error('TrackingService not initialized - credentials may be missing');
+      }
       const responses = await trackingService.trackMultiplePackages(batchTrackingNumbers).toPromise();
 
       expect(Array.isArray(responses)).toBe(true);
@@ -178,6 +196,9 @@ describe('Tracking Service Integration Tests', () => {
     }, 60000);
 
     it('should handle mixed success/failure in batch tracking', async () => {
+      if (!trackingService) {
+        throw new Error('TrackingService not initialized - credentials may be missing');
+      }
       const mixedTrackingNumbers = [
         '47384974350',     // Might succeed
         'INVALID_NUMBER',  // Should fail
@@ -207,6 +228,9 @@ describe('Tracking Service Integration Tests', () => {
     }, 60000);
 
     it('should handle empty batch gracefully', async () => {
+      if (!trackingService) {
+        throw new Error('TrackingService not initialized - credentials may be missing');
+      }
       const responses = await trackingService.trackMultiplePackages([]).toPromise();
 
       expect(Array.isArray(responses)).toBe(true);
@@ -293,7 +317,9 @@ describe('Tracking Service Integration Tests', () => {
 
     it('should handle network errors gracefully', async () => {
       // This test simulates network issues by using an extremely short timeout
-      const shortTimeoutConfig = { ...testConfig, timeout: 1 }; // 1ms timeout
+      const currentConfig = getTestConfig();
+      if (!currentConfig) return;
+      const shortTimeoutConfig = { ...currentConfig, timeout: 1 }; // 1ms timeout
 
       const shortTimeoutApp = await Test.createTestingModule({
         imports: [AramexModule.forRoot(shortTimeoutConfig)],

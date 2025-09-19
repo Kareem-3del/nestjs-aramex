@@ -1,4 +1,9 @@
 import 'reflect-metadata';
+import { config } from 'dotenv';
+import { join } from 'path';
+
+// Load environment variables from .env.local
+config({ path: join(__dirname, '../../.env.local') });
 
 // Security: Global flag to track if credentials are available
 let credentialsAvailable = false;
@@ -79,4 +84,22 @@ export const skipIfNoCredentials = () => {
     return true;
   }
   return false;
+};
+
+// Helper function to conditionally run tests
+export const describeIf = (condition: boolean, name: string, fn: () => void) => {
+  if (condition) {
+    describe(name, fn);
+  } else {
+    describe.skip(name, fn);
+  }
+};
+
+// Helper function to conditionally run individual tests
+export const itIf = (condition: boolean, name: string, fn: () => void | Promise<void>) => {
+  if (condition) {
+    it(name, fn);
+  } else {
+    it.skip(name, fn);
+  }
 };
