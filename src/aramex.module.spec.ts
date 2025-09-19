@@ -160,5 +160,41 @@ describe('AramexModule', () => {
       expect(module.providers).toHaveLength(4);
       expect(module.exports).toHaveLength(4);
     });
+
+    it('should create a working async module instance', async () => {
+      const asyncOptions = {
+        useFactory: () => mockConfig,
+        inject: [],
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        imports: [AramexModule.forRootAsync(asyncOptions)],
+      }).compile();
+
+      expect(module).toBeDefined();
+      expect(module.get(ShippingService)).toBeDefined();
+      expect(module.get(TrackingService)).toBeDefined();
+      expect(module.get(AramexHttpService)).toBeDefined();
+      expect(module.get(AramexSoapService)).toBeDefined();
+    });
+
+    it('should handle async configuration with Promise', async () => {
+      const asyncOptions = {
+        useFactory: async () => {
+          // Simulate async configuration loading
+          await new Promise(resolve => setTimeout(resolve, 10));
+          return mockConfig;
+        },
+        inject: [],
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        imports: [AramexModule.forRootAsync(asyncOptions)],
+      }).compile();
+
+      expect(module).toBeDefined();
+      const shippingService = module.get(ShippingService);
+      expect(shippingService).toBeDefined();
+    });
   });
 });

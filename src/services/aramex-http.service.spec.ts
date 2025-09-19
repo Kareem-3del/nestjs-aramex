@@ -459,6 +459,79 @@ describe('AramexHttpService', () => {
         },
       });
     });
+
+    it('should not log error details when debug is disabled', async () => {
+      // Create service with debug disabled
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          AramexHttpService,
+          {
+            provide: HttpService,
+            useValue: mockHttpService,
+          },
+          {
+            provide: ARAMEX_CONFIG_TOKEN,
+            useValue: createMockAramexConfig({
+              sandbox: true,
+              debug: false, // Debug disabled
+            }),
+          },
+        ],
+      }).compile();
+
+      const debugDisabledService = module.get<AramexHttpService>(AramexHttpService);
+      jest.spyOn(debugDisabledService['logger'], 'error').mockImplementation();
+
+      const axiosError: AxiosError = {
+        response: {
+          status: 400,
+          data: { ErrorMessage: 'Bad request' },
+          statusText: 'Bad Request',
+          headers: {},
+          config: {} as any,
+        },
+        message: 'Bad request',
+        name: 'AxiosError',
+        isAxiosError: true,
+        toJSON: () => ({}),
+        config: {} as any,
+      };
+
+      mockHttpService.get.mockReturnValue(throwError(() => axiosError));
+
+      try {
+        await debugDisabledService.get('/test-endpoint').toPromise();
+      } catch (error) {
+        expect(debugDisabledService['logger'].error).not.toHaveBeenCalled();
+      }
+    });
+
+    it('should handle error with undefined response data message', (done) => {
+      const axiosError: AxiosError = {
+        response: {
+          status: 500,
+          data: { ErrorMessage: undefined, message: undefined },
+          statusText: 'Internal Server Error',
+          headers: {},
+          config: {} as any,
+        },
+        message: '',
+        name: 'AxiosError',
+        isAxiosError: true,
+        toJSON: () => ({}),
+        config: {} as any,
+      };
+
+      mockHttpService.get.mockReturnValue(throwError(() => axiosError));
+
+      service.get('/test-endpoint').subscribe({
+        next: () => done(new Error('Should have thrown error')),
+        error: (error) => {
+          expect(error.message).toBe('Unknown error occurred');
+          done();
+        },
+      });
+    });
   });
 
   describe('AramexHttpException', () => {

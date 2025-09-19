@@ -1,0 +1,272 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+jobs:
+  dependabot-metadata:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    outputs:
+      update-type: ${{ steps.metadata.outputs.update-type }}
+      package-ecosystem: ${{ steps.metadata.outputs.package-ecosystem }}
+      dependency-type: ${{ steps.metadata.outputs.dependency-type }}
+      dependency-names: ${{ steps.metadata.outputs.dependency-names }}
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v1
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  security-check:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    needs: dependabot-metadata
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: high
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+
+  validate-changes:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    needs: dependabot-metadata
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run test coverage
+        run: npm run test:coverage
+
+      - name: Build package
+        run: npm run build
+
+      - name: Test build artifacts
+        run: |
+          if [ ! -f "dist/index.js" ] || [ ! -f "dist/index.d.ts" ]; then
+            echo "Build artifacts missing"
+            exit 1
+          fi
+
+  auto-merge:
+    runs-on: ubuntu-latest
+    needs: [dependabot-metadata, security-check, validate-changes]
+    if: |
+      github.actor == 'dependabot[bot]' &&
+      (
+        (needs.dependabot-metadata.outputs.update-type == 'version-update:semver-patch') ||
+        (needs.dependabot-metadata.outputs.update-type == 'version-update:semver-minor' && needs.dependabot-metadata.outputs.dependency-type == 'direct:development') ||
+        (needs.dependabot-metadata.outputs.package-ecosystem == 'github-actions')
+      )
+    steps:
+      - name: Wait for CI checks
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        id: wait-for-checks
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "test (18.x)"
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 600
+
+      - name: Wait for additional CI checks
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "test (20.x)"
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 600
+
+      - name: Wait for lint and type check
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "lint-and-type-check"
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 600
+
+      - name: Wait for security checks
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "security-audit"
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 600
+
+      - name: Wait for status checks
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "status-check"
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 600
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const updateType = '${{ needs.dependabot-metadata.outputs.update-type }}';
+            const packageEcosystem = '${{ needs.dependabot-metadata.outputs.package-ecosystem }}';
+            const dependencyType = '${{ needs.dependabot-metadata.outputs.dependency-type }}';
+
+            let reason = '';
+            if (packageEcosystem === 'github-actions') {
+              reason = 'GitHub Actions updates are auto-merged after validation';
+            } else if (updateType === 'version-update:semver-patch') {
+              reason = 'Patch updates are auto-merged after validation';
+            } else if (updateType === 'version-update:semver-minor' && dependencyType === 'direct:development') {
+              reason = 'Minor devDependency updates are auto-merged after validation';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🤖 **Auto-merge approved**\n\n✅ All checks passed\n📋 **Reason**: ${reason}\n\n**Validation completed:**\n- ✅ Security audit passed\n- ✅ Type checking passed\n- ✅ Tests passed (Node.js 18.x, 20.x)\n- ✅ Build successful\n- ✅ Dependency review passed\n\nMerging automatically...`
+            });
+
+      - name: Auto-merge PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              merge_method: 'squash'
+            });
+
+  require-manual-review:
+    runs-on: ubuntu-latest
+    needs: [dependabot-metadata, security-check, validate-changes]
+    if: |
+      github.actor == 'dependabot[bot]' &&
+      !failure() &&
+      !cancelled() &&
+      !(
+        (needs.dependabot-metadata.outputs.update-type == 'version-update:semver-patch') ||
+        (needs.dependabot-metadata.outputs.update-type == 'version-update:semver-minor' && needs.dependabot-metadata.outputs.dependency-type == 'direct:development') ||
+        (needs.dependabot-metadata.outputs.package-ecosystem == 'github-actions')
+      )
+    steps:
+      - name: Comment on PR - Manual Review Required
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const updateType = '${{ needs.dependabot-metadata.outputs.update-type }}';
+            const packageEcosystem = '${{ needs.dependabot-metadata.outputs.package-ecosystem }}';
+            const dependencyType = '${{ needs.dependabot-metadata.outputs.dependency-type }}';
+            const dependencyNames = '${{ needs.dependabot-metadata.outputs.dependency-names }}';
+
+            let reason = '';
+            if (updateType === 'version-update:semver-major') {
+              reason = 'Major version updates require manual review due to potential breaking changes';
+            } else if (updateType === 'version-update:semver-minor' && dependencyType === 'direct:production') {
+              reason = 'Minor production dependency updates require manual review';
+            } else {
+              reason = 'This dependency update requires manual review';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🔍 **Manual review required**\n\n📋 **Reason**: ${reason}\n🔧 **Update type**: ${updateType}\n📦 **Package ecosystem**: ${packageEcosystem}\n🎯 **Dependency type**: ${dependencyType}\n📝 **Dependencies**: ${dependencyNames}\n\n**Validation completed:**\n- ✅ Security audit passed\n- ✅ Type checking passed\n- ✅ Tests passed (Node.js 18.x, 20.x)\n- ✅ Build successful\n- ✅ Dependency review passed\n\n**Next steps:**\n1. Review the changes carefully\n2. Check for breaking changes in the dependency's changelog\n3. Test thoroughly in a development environment\n4. Approve and merge when ready\n\n**Auto-merge criteria:**\n- ✅ Patch updates (x.x.X)\n- ✅ Minor devDependency updates (x.X.x)\n- ✅ GitHub Actions updates\n- ❌ Major updates (X.x.x) - requires manual review\n- ❌ Minor production dependency updates - requires manual review`
+            });
+
+      - name: Request review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              reviewers: ['Kareem-3del']
+            });
+
+  cleanup-on-failure:
+    runs-on: ubuntu-latest
+    if: |
+      always() &&
+      github.actor == 'dependabot[bot]' &&
+      (needs.security-check.result == 'failure' || needs.validate-changes.result == 'failure')
+    needs: [dependabot-metadata, security-check, validate-changes]
+    steps:
+      - name: Comment on failed PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const securityResult = '${{ needs.security-check.result }}';
+            const validationResult = '${{ needs.validate-changes.result }}';
+
+            let failureReason = '';
+            if (securityResult === 'failure') {
+              failureReason = '🔴 Security checks failed - potential security vulnerabilities detected';
+            } else if (validationResult === 'failure') {
+              failureReason = '🔴 Validation failed - tests, type checking, or build failed';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ **Auto-merge blocked**\n\n${failureReason}\n\n**Failed checks:**\n${securityResult === 'failure' ? '- ❌ Security audit\n' : ''}${validationResult === 'failure' ? '- ❌ Validation (tests/build/types)\n' : ''}\n\n**Next steps:**\n1. Review the failed checks in the workflow logs\n2. Investigate the cause of the failure\n3. If it's a false positive, you may manually merge after thorough review\n4. If it's a real issue, consider updating or pinning the dependency version\n\n**This PR will not be auto-merged due to failed validation.**`
+            });
+
+      - name: Add failure labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['validation-failed', 'needs-investigation']
+            });

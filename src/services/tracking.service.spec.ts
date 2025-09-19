@@ -545,5 +545,96 @@ describe('TrackingService', () => {
         error: done,
       });
     });
+
+    it('should use HTTP tracking when useSoap is false in trackPackage', (done) => {
+      const trackingNumber = '123456789';
+      const mockResponse = createMockHttpTrackingResponse();
+
+      mockHttpService.post.mockReturnValue(of(mockResponse));
+
+      service.trackPackage({ trackingNumber, useSoap: false }).subscribe({
+        next: (response) => {
+          expect(response.success).toBe(true);
+          expect(response.trackingNumber).toBe(trackingNumber);
+          expect(mockHttpService.post).toHaveBeenCalled();
+          expect(mockSoapService.trackShipments).not.toHaveBeenCalled();
+          done();
+        },
+        error: done,
+      });
+    });
+
+    it('should handle empty tracking results array from SOAP service', (done) => {
+      const trackingNumbers = ['123456789'];
+      const mockResponse = createMockSoapTrackingResponse({
+        '123456789': [], // Empty array instead of undefined
+      });
+
+      mockSoapService.isClientReady.mockReturnValue(true);
+      mockSoapService.trackShipments.mockReturnValue(of(mockResponse));
+
+      service.trackMultiplePackages(trackingNumbers).subscribe({
+        next: (responses) => {
+          expect(responses).toHaveLength(1);
+          const response = responses[0];
+          expect(response.success).toBe(false);
+          expect(response.status).toBe('Not Found');
+          expect(response.message).toBe('Tracking information not available');
+          done();
+        },
+        error: done,
+      });
+    });
+
+    it('should handle null tracking results from SOAP service', (done) => {
+      const trackingNumbers = ['123456789'];
+      const mockResponse = createMockSoapTrackingResponse({
+        '123456789': null, // Null instead of undefined
+      });
+
+      mockSoapService.isClientReady.mockReturnValue(true);
+      mockSoapService.trackShipments.mockReturnValue(of(mockResponse));
+
+      service.trackMultiplePackages(trackingNumbers).subscribe({
+        next: (responses) => {
+          expect(responses).toHaveLength(1);
+          const response = responses[0];
+          expect(response.success).toBe(false);
+          expect(response.status).toBe('Not Found');
+          done();
+        },
+        error: done,
+      });
+    });
+
+    it('should handle tracking result with minimal data', (done) => {
+      const trackingNumbers = ['123456789'];
+      const mockTrackingResult = createMockTrackingResult({
+        WaybillNumber: '123456789',
+        UpdateCode: 'SHP',
+        UpdateDescription: 'Shipped',
+        UpdateDateTime: '2024-01-15T10:30:00Z',
+        UpdateLocation: 'New York, NY',
+        Comments: 'Package shipped',
+      });
+
+      const mockResponse = createMockSoapTrackingResponse({
+        '123456789': [mockTrackingResult],
+      });
+
+      mockSoapService.isClientReady.mockReturnValue(true);
+      mockSoapService.trackShipments.mockReturnValue(of(mockResponse));
+
+      service.trackMultiplePackages(trackingNumbers).subscribe({
+        next: (responses) => {
+          expect(responses).toHaveLength(1);
+          const response = responses[0];
+          expect(response.success).toBe(true);
+          expect(response.events).toHaveLength(1);
+          done();
+        },
+        error: done,
+      });
+    });
   });
 });

@@ -6,6 +6,7 @@ import { catchError, map, timeout } from 'rxjs/operators';
 import { AramexConfig } from '../interfaces/aramex-config.interface';
 import { ARAMEX_CONFIG_TOKEN } from '../aramex-config.module';
 import { ARAMEX_BASE_URLS } from '../constants/endpoints';
+import { RateLimiterService } from './rate-limiter.service';
 
 export class AramexHttpException extends Error {
   constructor(
@@ -27,6 +28,7 @@ export class AramexHttpService {
   constructor(
     private readonly httpService: HttpService,
     @Inject(ARAMEX_CONFIG_TOKEN) private readonly config: AramexConfig,
+    private readonly rateLimiter: RateLimiterService,
   ) {
     this.baseUrl = config.sandbox ? ARAMEX_BASE_URLS.SANDBOX : ARAMEX_BASE_URLS.PRODUCTION;
     this.clientInfo = {
@@ -78,10 +80,12 @@ export class AramexHttpService {
       this.logger.debug(`GET ${url}`, requestConfig);
     }
 
-    return this.httpService.get<T>(url, requestConfig).pipe(
-      timeout(this.config.timeout),
-      map((response: AxiosResponse<T>) => response.data),
-      catchError(this.handleError),
+    return this.rateLimiter.executeWithRateLimit(() =>
+      this.httpService.get<T>(url, requestConfig).pipe(
+        timeout(this.config.timeout),
+        map((response: AxiosResponse<T>) => response.data),
+        catchError(this.handleError),
+      )
     );
   }
 
@@ -92,10 +96,12 @@ export class AramexHttpService {
       this.logger.debug(`POST ${url}`, { data, config: requestConfig });
     }
 
-    return this.httpService.post<T>(url, data, requestConfig).pipe(
-      timeout(this.config.timeout),
-      map((response: AxiosResponse<T>) => response.data),
-      catchError(this.handleError),
+    return this.rateLimiter.executeWithRateLimit(() =>
+      this.httpService.post<T>(url, data, requestConfig).pipe(
+        timeout(this.config.timeout),
+        map((response: AxiosResponse<T>) => response.data),
+        catchError(this.handleError),
+      )
     );
   }
 

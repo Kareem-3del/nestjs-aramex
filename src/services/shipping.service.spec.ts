@@ -341,6 +341,40 @@ describe('ShippingService', () => {
         error: done,
       });
     });
+
+    it('should handle empty origin city and destination city', (done) => {
+      const mockResponse = createMockRateResponse();
+      mockHttpService.post.mockReturnValue(of(mockResponse));
+
+      service.getAvailableServices(',US', ',CA').subscribe({
+        next: () => {
+          const callArgs = mockHttpService.post.mock.calls[0][1];
+          expect(callArgs.OriginAddress.city).toBe('');
+          expect(callArgs.OriginAddress.countryCode).toBe('US');
+          expect(callArgs.DestinationAddress.city).toBe('');
+          expect(callArgs.DestinationAddress.countryCode).toBe('CA');
+          done();
+        },
+        error: done,
+      });
+    });
+
+    it('should handle undefined origin/destination parts after split', (done) => {
+      const mockResponse = createMockRateResponse();
+      mockHttpService.post.mockReturnValue(of(mockResponse));
+
+      service.getAvailableServices('NewYork', 'Toronto').subscribe({
+        next: () => {
+          const callArgs = mockHttpService.post.mock.calls[0][1];
+          expect(callArgs.OriginAddress.city).toBe('NewYork');
+          expect(callArgs.OriginAddress.countryCode).toBe('');
+          expect(callArgs.DestinationAddress.city).toBe('Toronto');
+          expect(callArgs.DestinationAddress.countryCode).toBe('');
+          done();
+        },
+        error: done,
+      });
+    });
   });
 
   describe('calculateShippingCost', () => {

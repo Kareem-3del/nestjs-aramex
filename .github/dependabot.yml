@@ -1,12 +1,13 @@
 version: 2
 updates:
-  # Enable version updates for npm
+  # Enable version updates for npm dependencies
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+      timezone: "UTC"
     open-pull-requests-limit: 10
     reviewers:
       - "Kareem-3del"
@@ -14,10 +15,38 @@ updates:
       - "Kareem-3del"
     commit-message:
       prefix: "chore"
+      prefix-development: "chore(dev)"
       include: "scope"
     labels:
       - "dependencies"
       - "automated"
+    # Auto-merge configuration for npm dependencies
+    groups:
+      development-dependencies:
+        patterns:
+          - "@types/*"
+          - "@nestjs/testing"
+          - "jest"
+          - "ts-jest"
+          - "typescript"
+        update-types:
+          - "minor"
+          - "patch"
+      patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    # Ignore major updates for critical dependencies that need manual review
+    ignore:
+      - dependency-name: "@nestjs/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "axios"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "class-transformer"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "class-validator"
+        update-types: ["version-update:semver-major"]
 
   # Enable security updates for GitHub Actions
   - package-ecosystem: "github-actions"
@@ -26,6 +55,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+      timezone: "UTC"
     open-pull-requests-limit: 5
     reviewers:
       - "Kareem-3del"
@@ -37,3 +67,8 @@ updates:
     labels:
       - "github-actions"
       - "automated"
+    # Group GitHub Actions updates
+    groups:
+      github-actions:
+        patterns:
+          - "*"

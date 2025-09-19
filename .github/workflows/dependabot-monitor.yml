@@ -1,0 +1,241 @@
+name: Dependabot Monitor
+
+on:
+  schedule:
+    # Run every day at 10 AM UTC to check dependabot status
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  monitor-dependabot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check dependabot PRs
+        uses: actions/github-script@v7
+        id: check-prs
+        with:
+          script: |
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: 'dependabot',
+              per_page: 100
+            });
+
+            const dependabotPRs = pulls.filter(pr => pr.user.login === 'dependabot[bot]');
+
+            let summary = {
+              total: dependabotPRs.length,
+              autoMergeable: 0,
+              needsReview: 0,
+              stale: 0,
+              failed: 0,
+              details: []
+            };
+
+            const now = new Date();
+            const staleDays = 14; // Consider PRs older than 14 days as stale
+
+            for (const pr of dependabotPRs) {
+              const createdAt = new Date(pr.created_at);
+              const ageInDays = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+
+              // Get PR checks
+              const { data: checkRuns } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: pr.head.sha
+              });
+
+              const hasFailedChecks = checkRuns.check_runs.some(check =>
+                check.status === 'completed' && check.conclusion === 'failure'
+              );
+
+              const hasApprovals = pr.requested_reviewers.length === 0;
+
+              let status = 'unknown';
+              if (hasFailedChecks) {
+                status = 'failed';
+                summary.failed++;
+              } else if (ageInDays > staleDays) {
+                status = 'stale';
+                summary.stale++;
+              } else if (pr.title.includes('patch') || pr.title.includes('minor')) {
+                status = 'auto-mergeable';
+                summary.autoMergeable++;
+              } else {
+                status = 'needs-review';
+                summary.needsReview++;
+              }
+
+              summary.details.push({
+                number: pr.number,
+                title: pr.title,
+                url: pr.html_url,
+                age: ageInDays,
+                status: status,
+                hasFailedChecks: hasFailedChecks,
+                hasApprovals: hasApprovals
+              });
+            }
+
+            console.log('Dependabot PR Summary:', JSON.stringify(summary, null, 2));
+            return summary;
+
+      - name: Create monitoring report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = ${{ steps.check-prs.outputs.result }};
+
+            if (summary.total === 0) {
+              console.log('No dependabot PRs found, skipping report');
+              return;
+            }
+
+            let reportContent = `# 🤖 Dependabot Status Report\n\n`;
+            reportContent += `**Generated:** ${new Date().toISOString()}\n\n`;
+            reportContent += `## Summary\n\n`;
+            reportContent += `| Status | Count |\n`;
+            reportContent += `|--------|-------|\n`;
+            reportContent += `| 📊 Total PRs | ${summary.total} |\n`;
+            reportContent += `| ✅ Auto-mergeable | ${summary.autoMergeable} |\n`;
+            reportContent += `| 👀 Needs review | ${summary.needsReview} |\n`;
+            reportContent += `| ⏰ Stale (>14 days) | ${summary.stale} |\n`;
+            reportContent += `| ❌ Failed checks | ${summary.failed} |\n\n`;
+
+            if (summary.details.length > 0) {
+              reportContent += `## Details\n\n`;
+
+              // Group by status
+              const groups = {
+                'failed': summary.details.filter(pr => pr.status === 'failed'),
+                'stale': summary.details.filter(pr => pr.status === 'stale'),
+                'needs-review': summary.details.filter(pr => pr.status === 'needs-review'),
+                'auto-mergeable': summary.details.filter(pr => pr.status === 'auto-mergeable')
+              };
+
+              for (const [status, prs] of Object.entries(groups)) {
+                if (prs.length === 0) continue;
+
+                const icons = {
+                  'failed': '❌',
+                  'stale': '⏰',
+                  'needs-review': '👀',
+                  'auto-mergeable': '✅'
+                };
+
+                reportContent += `### ${icons[status]} ${status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')} (${prs.length})\n\n`;
+
+                for (const pr of prs) {
+                  reportContent += `- [#${pr.number}](${pr.url}) - ${pr.title}\n`;
+                  reportContent += `  - Age: ${pr.age} days\n`;
+                  if (pr.hasFailedChecks) {
+                    reportContent += `  - ⚠️ Has failed checks\n`;
+                  }
+                  reportContent += `\n`;
+                }
+              }
+            }
+
+            // Add recommendations
+            reportContent += `## 📋 Recommendations\n\n`;
+
+            if (summary.failed > 0) {
+              reportContent += `- 🔴 **${summary.failed} PRs have failed checks** - investigate and fix issues\n`;
+            }
+
+            if (summary.stale > 0) {
+              reportContent += `- 🟡 **${summary.stale} PRs are stale** - consider closing or updating\n`;
+            }
+
+            if (summary.needsReview > 0) {
+              reportContent += `- 🟠 **${summary.needsReview} PRs need manual review** - likely major version updates\n`;
+            }
+
+            if (summary.autoMergeable > 0) {
+              reportContent += `- 🟢 **${summary.autoMergeable} PRs are ready for auto-merge** - waiting for CI completion\n`;
+            }
+
+            reportContent += `\n---\n\n`;
+            reportContent += `**Auto-merge criteria:**\n`;
+            reportContent += `- ✅ Patch updates (x.x.X)\n`;
+            reportContent += `- ✅ Minor devDependency updates (x.X.x)\n`;
+            reportContent += `- ✅ GitHub Actions updates\n`;
+            reportContent += `- ❌ Major updates (X.x.x) - requires manual review\n`;
+            reportContent += `- ❌ Minor production dependency updates - requires manual review\n\n`;
+            reportContent += `*This report is automatically generated daily. For real-time status, check the [Pull Requests tab](${context.payload.repository.html_url}/pulls).*`;
+
+            // Create or update issue for monitoring report
+            const issueTitle = '🤖 Dependabot Status Report';
+
+            try {
+              // Try to find existing issue
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'dependabot-monitor',
+                per_page: 1
+              });
+
+              if (issues.length > 0) {
+                // Update existing issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issues[0].number,
+                  body: reportContent
+                });
+                console.log(`Updated existing monitoring issue #${issues[0].number}`);
+              } else {
+                // Create new issue
+                const { data: newIssue } = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issueTitle,
+                  body: reportContent,
+                  labels: ['dependabot-monitor', 'automated']
+                });
+                console.log(`Created new monitoring issue #${newIssue.number}`);
+              }
+            } catch (error) {
+              console.error('Failed to create/update monitoring issue:', error);
+            }
+
+      - name: Check for critical issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = ${{ steps.check-prs.outputs.result }};
+
+            // Alert if there are concerning numbers
+            const alerts = [];
+
+            if (summary.failed > 3) {
+              alerts.push(`🚨 High number of failed dependabot PRs: ${summary.failed}`);
+            }
+
+            if (summary.stale > 5) {
+              alerts.push(`⚠️ High number of stale dependabot PRs: ${summary.stale}`);
+            }
+
+            if (summary.total > 15) {
+              alerts.push(`📊 High number of open dependabot PRs: ${summary.total}`);
+            }
+
+            if (alerts.length > 0) {
+              console.log('⚠️ ALERTS DETECTED:');
+              alerts.forEach(alert => console.log(alert));
+
+              // You could add Slack/Discord notifications here
+              // Or create a high-priority issue
+            } else {
+              console.log('✅ No critical issues detected');
+            }

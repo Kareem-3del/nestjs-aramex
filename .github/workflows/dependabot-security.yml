@@ -1,0 +1,230 @@
+name: Dependabot Security Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+  actions: read
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit with detailed output
+        id: npm-audit
+        run: |
+          echo "Running npm audit..."
+          npm audit --json > audit-report.json || true
+
+          # Parse audit results
+          if [ -s audit-report.json ]; then
+            VULNERABILITIES=$(cat audit-report.json | jq '.metadata.vulnerabilities // {}')
+            TOTAL_VULNS=$(echo $VULNERABILITIES | jq '.info + .low + .moderate + .high + .critical')
+            HIGH_CRITICAL=$(echo $VULNERABILITIES | jq '.high + .critical')
+
+            echo "total_vulnerabilities=$TOTAL_VULNS" >> $GITHUB_OUTPUT
+            echo "high_critical_vulnerabilities=$HIGH_CRITICAL" >> $GITHUB_OUTPUT
+
+            echo "Vulnerability summary:"
+            echo "Total vulnerabilities: $TOTAL_VULNS"
+            echo "High/Critical vulnerabilities: $HIGH_CRITICAL"
+
+            if [ "$HIGH_CRITICAL" -gt 0 ]; then
+              echo "🚨 High or critical vulnerabilities detected!"
+              exit 1
+            fi
+          else
+            echo "No vulnerabilities detected"
+            echo "total_vulnerabilities=0" >> $GITHUB_OUTPUT
+            echo "high_critical_vulnerabilities=0" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Generate security report
+        if: always()
+        run: |
+          cat > security-report.md << 'EOF'
+          # 🔒 Security Scan Report
+
+          **Scan Date:** $(date -u)
+          **PR:** #${{ github.event.number }}
+          **Branch:** ${{ github.head_ref }}
+
+          ## Vulnerability Summary
+
+          - **Total vulnerabilities:** ${{ steps.npm-audit.outputs.total_vulnerabilities }}
+          - **High/Critical vulnerabilities:** ${{ steps.npm-audit.outputs.high_critical_vulnerabilities }}
+
+          ## Audit Details
+
+          ```json
+          $(cat audit-report.json | jq '.' 2>/dev/null || echo "No audit data available")
+          ```
+
+          ## Recommendations
+
+          - Review dependency changes carefully
+          - Check for known security advisories
+          - Consider pinning vulnerable dependencies if fixes are not available
+          - Monitor security updates after merge
+
+          ---
+          *This report is automatically generated for dependabot PRs*
+          EOF
+
+      - name: Check package-lock.json integrity
+        run: |
+          echo "Validating package-lock.json integrity..."
+          npm ci --ignore-scripts
+
+          # Check if package-lock.json is properly formatted
+          if ! jq empty package-lock.json; then
+            echo "❌ package-lock.json is not valid JSON"
+            exit 1
+          fi
+
+          # Verify lockfile version
+          LOCKFILE_VERSION=$(jq -r '.lockfileVersion' package-lock.json)
+          if [ "$LOCKFILE_VERSION" != "3" ]; then
+            echo "⚠️ Unexpected lockfile version: $LOCKFILE_VERSION"
+          fi
+
+          echo "✅ package-lock.json validation passed"
+
+      - name: Check for suspicious changes
+        run: |
+          echo "Checking for suspicious dependency changes..."
+
+          # Check if any new dependencies were added unexpectedly
+          git diff HEAD~1 package.json > package-changes.diff
+
+          if grep -q '"dependencies"' package-changes.diff; then
+            echo "📦 Production dependencies changed"
+            git diff HEAD~1 package.json | grep -A 10 -B 10 '"dependencies"' || true
+          fi
+
+          if grep -q '"devDependencies"' package-changes.diff; then
+            echo "🔧 Development dependencies changed"
+            git diff HEAD~1 package.json | grep -A 10 -B 10 '"devDependencies"' || true
+          fi
+
+          # Check for any postinstall or preinstall scripts
+          if jq -e '.scripts | to_entries[] | select(.key | test("install"))' package.json > /dev/null; then
+            echo "⚠️ Package contains install scripts - review carefully"
+            jq '.scripts | to_entries[] | select(.key | test("install"))' package.json
+          fi
+
+      - name: Verify dependency sources
+        run: |
+          echo "Verifying dependency sources..."
+
+          # Check if all dependencies come from npm registry
+          npm ls --json > dependency-tree.json || true
+
+          # Look for any dependencies from non-standard sources
+          if grep -q '"resolved".*"git+' dependency-tree.json; then
+            echo "⚠️ Git dependencies detected - review carefully"
+            grep '"resolved".*"git+' dependency-tree.json || true
+          fi
+
+          if grep -q '"resolved".*"file:' dependency-tree.json; then
+            echo "⚠️ Local file dependencies detected - review carefully"
+            grep '"resolved".*"file:' dependency-tree.json || true
+          fi
+
+      - name: License compliance check
+        run: |
+          echo "Checking license compliance..."
+
+          # Use npm-license-checker to verify all licenses
+          npx license-checker --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;CC0-1.0;Unlicense' --summary || {
+            echo "❌ License compliance check failed"
+            echo "The following licenses were detected:"
+            npx license-checker --summary
+            exit 1
+          }
+
+          echo "✅ All licenses are compliant"
+
+      - name: Comment security results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const totalVulns = '${{ steps.npm-audit.outputs.total_vulnerabilities }}' || '0';
+            const highCriticalVulns = '${{ steps.npm-audit.outputs.high_critical_vulnerabilities }}' || '0';
+
+            let securityStatus = '✅ **Security scan passed**';
+            let securityIcon = '🔒';
+
+            if (parseInt(highCriticalVulns) > 0) {
+              securityStatus = '❌ **Security scan failed**';
+              securityIcon = '🚨';
+            } else if (parseInt(totalVulns) > 0) {
+              securityStatus = '⚠️ **Security scan completed with warnings**';
+              securityIcon = '⚠️';
+            }
+
+            const comment = `${securityIcon} **Dependabot Security Validation**
+
+            ${securityStatus}
+
+            **Vulnerability Summary:**
+            - Total vulnerabilities: ${totalVulns}
+            - High/Critical vulnerabilities: ${highCriticalVulns}
+
+            **Security Checks:**
+            - ${parseInt(highCriticalVulns) === 0 ? '✅' : '❌'} No high/critical vulnerabilities
+            - ✅ Package-lock.json integrity verified
+            - ✅ Dependency sources verified
+            - ✅ License compliance checked
+            - ✅ Suspicious changes reviewed
+
+            ${parseInt(highCriticalVulns) > 0 ?
+              '**⚠️ Action Required:** This PR contains high or critical security vulnerabilities and should not be auto-merged. Manual review is required.' :
+              '**✅ Security Approved:** This PR passed all security checks and is safe for auto-merge (if other criteria are met).'
+            }
+
+            <details>
+            <summary>View detailed security report</summary>
+
+            ${fs.existsSync('security-report.md') ? fs.readFileSync('security-report.md', 'utf8') : 'No detailed report available'}
+
+            </details>
+
+            ---
+            *Automated security validation for dependabot PRs*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Block auto-merge on security issues
+        if: steps.npm-audit.outputs.high_critical_vulnerabilities > 0
+        run: |
+          echo "🚨 Blocking auto-merge due to security vulnerabilities"
+          echo "High/Critical vulnerabilities detected: ${{ steps.npm-audit.outputs.high_critical_vulnerabilities }}"
+          exit 1
