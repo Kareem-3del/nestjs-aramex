@@ -14,3 +14,14 @@ global.console = {
 
 // Mock process.env
 process.env.NODE_ENV = 'test';
+
+// Clean up timers and resources after each test
+afterEach(() => {
+  jest.clearAllTimers();
+  jest.restoreAllMocks();
+});
+
+// Global teardown to prevent memory leaks
+afterAll(() => {
+  jest.clearAllTimers();
+});

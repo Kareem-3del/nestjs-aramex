@@ -24,4 +24,7 @@ module.exports = {
   },
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/../test/jest.setup.ts'],
+  forceExit: true,
+  detectOpenHandles: true,
+  workerIdleMemoryLimit: '512MB',
 };
