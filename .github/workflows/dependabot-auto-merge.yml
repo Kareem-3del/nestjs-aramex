@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v1
+        uses: dependabot/fetch-metadata@v2
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
@@ -37,7 +37,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20.x'
           cache: 'npm'
@@ -49,7 +49,7 @@ jobs:
         run: npm audit --audit-level=moderate
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v3
+        uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
           allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
@@ -68,7 +68,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
@@ -148,7 +148,7 @@ jobs:
           timeoutSeconds: 600
 
       - name: Comment on PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const updateType = '${{ needs.dependabot-metadata.outputs.update-type }}';
@@ -172,7 +172,7 @@ jobs:
             });
 
       - name: Auto-merge PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             await github.rest.pulls.merge({
@@ -196,7 +196,7 @@ jobs:
       )
     steps:
       - name: Comment on PR - Manual Review Required
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const updateType = '${{ needs.dependabot-metadata.outputs.update-type }}';
@@ -221,7 +221,7 @@ jobs:
             });
 
       - name: Request review
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             github.rest.pulls.requestReviewers({
@@ -240,7 +240,7 @@ jobs:
     needs: [dependabot-metadata, security-check, validate-changes]
     steps:
       - name: Comment on failed PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const securityResult = '${{ needs.security-check.result }}';
@@ -261,7 +261,7 @@ jobs:
             });
 
       - name: Add failure labels
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             github.rest.issues.addLabels({
