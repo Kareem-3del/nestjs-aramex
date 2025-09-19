@@ -145,11 +145,14 @@ describe('Aramex Integration Tests', () => {
         address: '456 Test Avenue',
       },
       packageDetails: {
-        weight: { value: 1, unit: 'kg' },
-        dimensions: { length: 20, width: 15, height: 10, unit: 'cm' },
-        description: 'Test package',
-        reference: 'TEST-' + Date.now(),
+        weight: 1,
+        length: 20,
+        width: 15,
+        height: 10,
+        unit: 'kg' as const,
+        dimensionUnit: 'cm' as const,
       },
+      descriptionOfGoods: 'Test package',
     };
 
     it('should calculate shipping rates', async () => {
@@ -166,9 +169,9 @@ describe('Aramex Integration Tests', () => {
         const service = response.services[0];
         expect(service).toBeDefined();
         expect(typeof service.serviceName).toBe('string');
-        expect(typeof service.serviceCode).toBe('string');
-        expect(typeof service.totalAmount).toBe('number');
-        expect(typeof service.currency).toBe('string');
+        expect(typeof service.serviceId).toBe('string');
+        expect(typeof service.cost.amount).toBe('number');
+        expect(typeof service.cost.currency).toBe('string');
       } else {
         // In sandbox mode, we might get errors, which is expected
         expect(Array.isArray(response.errors)).toBe(true);
@@ -303,11 +306,14 @@ describe('Aramex Integration Tests', () => {
           address: '',
         },
         packageDetails: {
-          weight: { value: 0, unit: 'kg' },
-          dimensions: { length: 0, width: 0, height: 0, unit: 'cm' },
-          description: '',
-          reference: '',
+          weight: 0,
+          length: 0,
+          width: 0,
+          height: 0,
+          unit: 'kg' as const,
+          dimensionUnit: 'cm' as const,
         },
+        descriptionOfGoods: '',
       };
 
       try {
@@ -372,7 +378,8 @@ describe('Aramex Integration Tests', () => {
       await shippingService.calculateRates({
         origin: { country: 'US', city: 'New York', postalCode: '10001', state: 'NY', address: '123 Test' },
         destination: { country: 'CA', city: 'Toronto', postalCode: 'M5V 3L9', state: 'ON', address: '456 Test' },
-        packageDetails: { weight: { value: 1, unit: 'kg' }, dimensions: { length: 10, width: 10, height: 10, unit: 'cm' }, description: 'Test', reference: 'TEST' },
+        packageDetails: { weight: 1, length: 10, width: 10, height: 10, unit: 'kg' as const, dimensionUnit: 'cm' as const },
+        descriptionOfGoods: 'Test',
       }).toPromise();
 
       const metrics = healthMonitor.getPerformanceMetrics();
