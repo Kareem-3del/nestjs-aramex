@@ -66,3 +66,6 @@ jspm_packages/
 
 # Optional package-lock file
 package-lock.json
+
+# Claude Code
+.claude
