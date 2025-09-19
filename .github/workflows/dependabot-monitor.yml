@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check dependabot PRs
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         id: check-prs
         with:
           script: |
@@ -89,7 +89,7 @@ jobs:
             return summary;
 
       - name: Create monitoring report
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const summary = ${{ steps.check-prs.outputs.result }};
@@ -210,7 +210,7 @@ jobs:
             }
 
       - name: Check for critical issues
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const summary = ${{ steps.check-prs.outputs.result }};
