@@ -7,7 +7,7 @@
   },
   "coverageDirectory": "../coverage-integration",
   "testEnvironment": "node",
-  "moduleNameMapping": {
+  "moduleNameMapper": {
     "^src/(.*)$": "<rootDir>/src/$1"
   },
   "setupFilesAfterEnv": ["<rootDir>/test/integration/setup.ts"],
